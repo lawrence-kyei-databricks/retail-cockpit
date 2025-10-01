@@ -11,9 +11,6 @@ variables:
     description: "Schema name for retail tables"
     default: "cockpit"
 
-  workspace_url:
-    description: "Databricks workspace URL"
-
   deployment_env:
     description: "Deployment environment (dev/staging/prod)"
     default: "dev"
@@ -22,15 +19,15 @@ targets:
   dev:
     mode: development
     workspace:
-      host: ${var.workspace_url}
+      host: https://e2-demo-field-eng.cloud.databricks.com
 
     variables:
-      catalog_name: "retail_analytics_dev"
+      catalog_name: "retail_demo"
 
   staging:
     mode: production
     workspace:
-      host: ${var.workspace_url}
+      host: https://e2-demo-field-eng.cloud.databricks.com
 
     variables:
       catalog_name: "retail_analytics_staging"
@@ -38,7 +35,7 @@ targets:
   prod:
     mode: production
     workspace:
-      host: ${var.workspace_url}
+      host: https://e2-demo-field-eng.cloud.databricks.com
 
     variables:
       catalog_name: "retail_analytics"
@@ -103,7 +100,7 @@ resources:
         - job_cluster_key: "refresh"
           new_cluster:
             spark_version: "13.3.x-scala2.12"
-            node_type_id: "i3.large"
+            node_type_id: "i3.xlarge"
             num_workers: 1
 
       tasks:
