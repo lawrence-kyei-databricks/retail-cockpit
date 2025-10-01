@@ -443,6 +443,10 @@ spark.sql(f"USE {catalog_name}.{schema_name}")
 spark.sql(f"""
 CREATE TABLE IF NOT EXISTS {catalog_name}.{schema_name}.daily_sales_agg_materialized
 USING DELTA
+TBLPROPERTIES (
+  'delta.autoOptimize.optimizeWrite' = 'true',
+  'delta.autoOptimize.autoCompact' = 'true'
+)
 AS SELECT * FROM daily_sales_agg
 """)
 
@@ -454,9 +458,15 @@ print("Created materialized daily sales aggregation table")
 # COMMAND ----------
 
 # Create materialized table for inventory alerts
+# First enable column defaults feature
 spark.sql(f"""
 CREATE TABLE IF NOT EXISTS {catalog_name}.{schema_name}.inventory_alerts_materialized
 USING DELTA
+TBLPROPERTIES (
+  'delta.feature.allowColumnDefaults' = 'supported',
+  'delta.autoOptimize.optimizeWrite' = 'true',
+  'delta.autoOptimize.autoCompact' = 'true'
+)
 AS SELECT * FROM inventory_alerts
 """)
 

@@ -17,6 +17,7 @@ from datetime import datetime, timedelta, date
 from pyspark.sql import functions as F
 from pyspark.sql.types import *
 import uuid
+from decimal import Decimal
 
 # Get parameters
 catalog_name = dbutils.widgets.get("catalog_name")
@@ -38,28 +39,48 @@ spark.conf.set("spark.sql.adaptive.enabled", "true")
 
 # COMMAND ----------
 
-# Store data
+# Clear existing data from stores table
+spark.sql(f"TRUNCATE TABLE {catalog_name}.{schema_name}.stores")
+
+# Store data with proper decimal types
 stores_data = [
-    ("STORE_001", "Downtown Flagship", "West", "Metro West", "123 Main St", "San Francisco", "CA", "USA", "94105", 37.7749, -122.4194, "Flagship", 15000, "2018-03-15", "Active", "MGR_001"),
-    ("STORE_002", "Mall Central", "West", "Metro West", "456 Shopping Center Dr", "Los Angeles", "CA", "USA", "90210", 34.0522, -118.2437, "Mall", 12000, "2019-06-01", "Active", "MGR_002"),
-    ("STORE_003", "Suburban Plaza", "West", "Metro South", "789 Plaza Blvd", "San Diego", "CA", "USA", "92101", 32.7157, -117.1611, "Plaza", 8000, "2020-01-20", "Active", "MGR_003"),
-    ("STORE_004", "Outlet Center", "West", "Metro North", "321 Outlet Way", "Sacramento", "CA", "USA", "95814", 38.5816, -121.4944, "Outlet", 10000, "2017-11-12", "Active", "MGR_004"),
-    ("STORE_005", "Metro East", "East", "Metro East", "555 Commerce St", "New York", "NY", "USA", "10001", 40.7128, -74.0060, "Standalone", 11000, "2019-09-05", "Active", "MGR_005"),
-    ("STORE_006", "Boston Commons", "East", "Metro East", "777 Commonwealth Ave", "Boston", "MA", "USA", "02116", 42.3601, -71.0589, "Mall", 9500, "2020-04-18", "Active", "MGR_006"),
-    ("STORE_007", "Chicago Loop", "Central", "Metro Central", "999 State St", "Chicago", "IL", "USA", "60601", 41.8781, -87.6298, "Standalone", 13000, "2018-08-25", "Active", "MGR_007"),
-    ("STORE_008", "Dallas Galleria", "Central", "Metro South", "111 Galleria Pkwy", "Dallas", "TX", "USA", "75240", 32.7767, -96.7970, "Mall", 14000, "2019-12-10", "Active", "MGR_008"),
-    ("STORE_009", "Miami Beach", "South", "Metro South", "222 Ocean Dr", "Miami", "FL", "USA", "33139", 25.7617, -80.1918, "Standalone", 7500, "2021-02-14", "Active", "MGR_009"),
-    ("STORE_010", "Atlanta Perimeter", "South", "Metro South", "333 Perimeter Mall Dr", "Atlanta", "GA", "USA", "30346", 33.9304, -84.3413, "Mall", 12500, "2018-07-07", "Active", "MGR_010")
+    ("STORE_001", "Downtown Flagship", "West", "Metro West", "123 Main St", "San Francisco", "CA", "USA", "94105", Decimal("37.77490000"), Decimal("-122.41940000"), "Flagship", 15000, date(2018, 3, 15), "Active", "MGR_001"),
+    ("STORE_002", "Mall Central", "West", "Metro West", "456 Shopping Center Dr", "Los Angeles", "CA", "USA", "90210", Decimal("34.05220000"), Decimal("-118.24370000"), "Mall", 12000, date(2019, 6, 1), "Active", "MGR_002"),
+    ("STORE_003", "Suburban Plaza", "West", "Metro South", "789 Plaza Blvd", "San Diego", "CA", "USA", "92101", Decimal("32.71570000"), Decimal("-117.16110000"), "Plaza", 8000, date(2020, 1, 20), "Active", "MGR_003"),
+    ("STORE_004", "Outlet Center", "West", "Metro North", "321 Outlet Way", "Sacramento", "CA", "USA", "95814", Decimal("38.58160000"), Decimal("-121.49440000"), "Outlet", 10000, date(2017, 11, 12), "Active", "MGR_004"),
+    ("STORE_005", "Metro East", "East", "Metro East", "555 Commerce St", "New York", "NY", "USA", "10001", Decimal("40.71280000"), Decimal("-74.00600000"), "Standalone", 11000, date(2019, 9, 5), "Active", "MGR_005"),
+    ("STORE_006", "Boston Commons", "East", "Metro East", "777 Commonwealth Ave", "Boston", "MA", "USA", "02116", Decimal("42.36010000"), Decimal("-71.05890000"), "Mall", 9500, date(2020, 4, 18), "Active", "MGR_006"),
+    ("STORE_007", "Chicago Loop", "Central", "Metro Central", "999 State St", "Chicago", "IL", "USA", "60601", Decimal("41.87810000"), Decimal("-87.62980000"), "Standalone", 13000, date(2018, 8, 25), "Active", "MGR_007"),
+    ("STORE_008", "Dallas Galleria", "Central", "Metro South", "111 Galleria Pkwy", "Dallas", "TX", "USA", "75240", Decimal("32.77670000"), Decimal("-96.79700000"), "Mall", 14000, date(2019, 12, 10), "Active", "MGR_008"),
+    ("STORE_009", "Miami Beach", "South", "Metro South", "222 Ocean Dr", "Miami", "FL", "USA", "33139", Decimal("25.76170000"), Decimal("-80.19180000"), "Standalone", 7500, date(2021, 2, 14), "Active", "MGR_009"),
+    ("STORE_010", "Atlanta Perimeter", "South", "Metro South", "333 Perimeter Mall Dr", "Atlanta", "GA", "USA", "30346", Decimal("33.93040000"), Decimal("-84.34130000"), "Mall", 12500, date(2018, 7, 7), "Active", "MGR_010")
 ]
 
-stores_columns = ["store_id", "store_name", "region", "district", "address", "city", "state", "country",
-                 "postal_code", "latitude", "longitude", "store_type", "square_footage", "opening_date",
-                 "status", "manager_id"]
+stores_schema = StructType([
+    StructField("store_id", StringType(), False),
+    StructField("store_name", StringType(), False),
+    StructField("region", StringType(), False),
+    StructField("district", StringType(), True),
+    StructField("address", StringType(), True),
+    StructField("city", StringType(), True),
+    StructField("state", StringType(), True),
+    StructField("country", StringType(), True),
+    StructField("postal_code", StringType(), True),
+    StructField("latitude", DecimalType(10,8), True),
+    StructField("longitude", DecimalType(11,8), True),
+    StructField("store_type", StringType(), True),
+    StructField("square_footage", IntegerType(), True),
+    StructField("opening_date", DateType(), True),
+    StructField("status", StringType(), True),
+    StructField("manager_id", StringType(), True)
+])
 
-stores_df = spark.createDataFrame(stores_data, stores_columns)
-stores_df = stores_df.withColumn("created_at", F.current_timestamp()).withColumn("updated_at", F.current_timestamp())
+stores_df = spark.createDataFrame(stores_data, stores_schema)
+stores_df = stores_df.withColumn("created_at", F.current_timestamp()) \
+                   .withColumn("updated_at", F.current_timestamp())
 
-stores_df.write.mode("overwrite").saveAsTable(f"{catalog_name}.{schema_name}.stores")
+stores_df.createOrReplaceTempView("temp_stores")
+spark.sql(f"INSERT INTO {catalog_name}.{schema_name}.stores SELECT * FROM temp_stores")
 print(f"Generated {stores_df.count()} stores")
 
 # COMMAND ----------
@@ -68,6 +89,9 @@ print(f"Generated {stores_df.count()} stores")
 # MAGIC ## Generate Categories Data
 
 # COMMAND ----------
+
+# Clear existing data from categories table
+spark.sql(f"TRUNCATE TABLE {catalog_name}.{schema_name}.categories")
 
 # Category hierarchy data
 categories_data = [
@@ -104,12 +128,22 @@ categories_data = [
     ("CAT_222", "Dress Pants", "CAT_022", 3, "Formal trousers", True),
 ]
 
-categories_columns = ["category_id", "category_name", "parent_category_id", "category_level", "description", "is_active"]
+categories_schema = StructType([
+    StructField("category_id", StringType(), False),
+    StructField("category_name", StringType(), False),
+    StructField("parent_category_id", StringType(), True),
+    StructField("category_level", IntegerType(), True),
+    StructField("description", StringType(), True),
+    StructField("is_active", BooleanType(), True)
+])
 
-categories_df = spark.createDataFrame(categories_data, categories_columns)
-categories_df = categories_df.withColumn("created_at", F.current_timestamp()).withColumn("updated_at", F.current_timestamp())
+categories_df = spark.createDataFrame(categories_data, categories_schema)
+categories_df = categories_df.withColumn("is_active", F.when(F.col("is_active").isNull(), F.lit(True)).otherwise(F.col("is_active"))) \
+                           .withColumn("created_at", F.current_timestamp()) \
+                           .withColumn("updated_at", F.current_timestamp())
 
-categories_df.write.mode("overwrite").saveAsTable(f"{catalog_name}.{schema_name}.categories")
+categories_df.createOrReplaceTempView("temp_categories")
+spark.sql(f"INSERT INTO {catalog_name}.{schema_name}.categories SELECT * FROM temp_categories")
 print(f"Generated {categories_df.count()} categories")
 
 # COMMAND ----------
@@ -119,23 +153,39 @@ print(f"Generated {categories_df.count()} categories")
 
 # COMMAND ----------
 
+# Clear existing data from suppliers table
+spark.sql(f"TRUNCATE TABLE {catalog_name}.{schema_name}.suppliers")
+
 # Supplier data
 suppliers_data = [
-    ("SUP_001", "Fashion Forward Inc", "Jane Smith", "jane@fashionforward.com", "+1-555-0101", "100 Fashion Ave", "New York", "USA", 14, 4.2, "Net 30", True),
-    ("SUP_002", "Global Textiles Ltd", "Mark Johnson", "mark@globaltextiles.com", "+1-555-0102", "200 Textile Blvd", "Los Angeles", "USA", 21, 3.8, "Net 45", True),
-    ("SUP_003", "Trendy Shoes Co", "Sarah Wilson", "sarah@trendyshoes.com", "+1-555-0103", "300 Shoe Street", "Chicago", "USA", 10, 4.5, "Net 30", True),
-    ("SUP_004", "Electronics Plus", "David Chen", "david@electronicsplus.com", "+1-555-0104", "400 Tech Park Dr", "San Francisco", "USA", 7, 4.1, "Net 15", True),
-    ("SUP_005", "Home Comforts", "Lisa Brown", "lisa@homecomforts.com", "+1-555-0105", "500 Comfort Lane", "Atlanta", "USA", 18, 3.9, "Net 60", True),
-    ("SUP_006", "Kids World", "Tom Davis", "tom@kidsworld.com", "+1-555-0106", "600 Playground St", "Miami", "USA", 12, 4.3, "Net 30", True),
+    ("SUP_001", "Fashion Forward Inc", "Jane Smith", "jane@fashionforward.com", "+1-555-0101", "100 Fashion Ave", "New York", "USA", 14, Decimal("4.20"), "Net 30", True),
+    ("SUP_002", "Global Textiles Ltd", "Mark Johnson", "mark@globaltextiles.com", "+1-555-0102", "200 Textile Blvd", "Los Angeles", "USA", 21, Decimal("3.80"), "Net 45", True),
+    ("SUP_003", "Trendy Shoes Co", "Sarah Wilson", "sarah@trendyshoes.com", "+1-555-0103", "300 Shoe Street", "Chicago", "USA", 10, Decimal("4.50"), "Net 30", True),
+    ("SUP_004", "Electronics Plus", "David Chen", "david@electronicsplus.com", "+1-555-0104", "400 Tech Park Dr", "San Francisco", "USA", 7, Decimal("4.10"), "Net 15", True),
+    ("SUP_005", "Home Comforts", "Lisa Brown", "lisa@homecomforts.com", "+1-555-0105", "500 Comfort Lane", "Atlanta", "USA", 18, Decimal("3.90"), "Net 60", True),
+    ("SUP_006", "Kids World", "Tom Davis", "tom@kidsworld.com", "+1-555-0106", "600 Playground St", "Miami", "USA", 12, Decimal("4.30"), "Net 30", True),
 ]
 
-suppliers_columns = ["supplier_id", "supplier_name", "contact_person", "email", "phone", "address",
-                    "city", "country", "lead_time_days", "performance_rating", "payment_terms", "is_active"]
+suppliers_schema = StructType([
+    StructField("supplier_id", StringType(), False),
+    StructField("supplier_name", StringType(), False),
+    StructField("contact_person", StringType(), True),
+    StructField("email", StringType(), True),
+    StructField("phone", StringType(), True),
+    StructField("address", StringType(), True),
+    StructField("city", StringType(), True),
+    StructField("country", StringType(), True),
+    StructField("lead_time_days", IntegerType(), True),
+    StructField("performance_rating", DecimalType(3,2), True),
+    StructField("payment_terms", StringType(), True),
+    StructField("is_active", BooleanType(), True)
+])
 
-suppliers_df = spark.createDataFrame(suppliers_data, suppliers_columns)
+suppliers_df = spark.createDataFrame(suppliers_data, suppliers_schema)
 suppliers_df = suppliers_df.withColumn("created_at", F.current_timestamp()).withColumn("updated_at", F.current_timestamp())
 
-suppliers_df.write.mode("overwrite").saveAsTable(f"{catalog_name}.{schema_name}.suppliers")
+suppliers_df.createOrReplaceTempView("temp_suppliers")
+spark.sql(f"INSERT INTO {catalog_name}.{schema_name}.suppliers SELECT * FROM temp_suppliers")
 print(f"Generated {suppliers_df.count()} suppliers")
 
 # COMMAND ----------
@@ -145,6 +195,9 @@ print(f"Generated {suppliers_df.count()} suppliers")
 
 # COMMAND ----------
 
+# Clear existing data from products table
+spark.sql(f"TRUNCATE TABLE {catalog_name}.{schema_name}.products")
+
 # Product generation function
 def generate_products(num_products=500):
     products = []
@@ -152,33 +205,33 @@ def generate_products(num_products=500):
     # Define product templates by category
     product_templates = {
         "CAT_111": [  # Casual Dresses
-            ("Casual Summer Dress", ["Navy", "Red", "Black", "White"], ["XS", "S", "M", "L", "XL"], "SUP_001", "StyleCo", 25.99, 49.99, 35.99),
-            ("Cotton Midi Dress", ["Blue", "Green", "Pink"], ["S", "M", "L", "XL"], "SUP_001", "ComfortWear", 22.50, 44.99, 32.99),
-            ("Floral Print Dress", ["Multicolor"], ["XS", "S", "M", "L"], "SUP_001", "FlowerPower", 28.00, 54.99, 39.99),
+            ("Casual Summer Dress", ["Navy", "Red", "Black", "White"], ["XS", "S", "M", "L", "XL"], "SUP_001", "StyleCo", Decimal("25.99"), Decimal("49.99"), Decimal("35.99")),
+            ("Cotton Midi Dress", ["Blue", "Green", "Pink"], ["S", "M", "L", "XL"], "SUP_001", "ComfortWear", Decimal("22.50"), Decimal("44.99"), Decimal("32.99")),
+            ("Floral Print Dress", ["Multicolor"], ["XS", "S", "M", "L"], "SUP_001", "FlowerPower", Decimal("28.00"), Decimal("54.99"), Decimal("39.99")),
         ],
         "CAT_112": [  # Formal Dresses
-            ("Evening Gown", ["Black", "Navy", "Burgundy"], ["XS", "S", "M", "L", "XL"], "SUP_001", "Elegance", 75.00, 149.99, 99.99),
-            ("Cocktail Dress", ["Black", "Red", "Gold"], ["XS", "S", "M", "L"], "SUP_001", "PartyTime", 45.00, 89.99, 64.99),
+            ("Evening Gown", ["Black", "Navy", "Burgundy"], ["XS", "S", "M", "L", "XL"], "SUP_001", "Elegance", Decimal("75.00"), Decimal("149.99"), Decimal("99.99")),
+            ("Cocktail Dress", ["Black", "Red", "Gold"], ["XS", "S", "M", "L"], "SUP_001", "PartyTime", Decimal("45.00"), Decimal("89.99"), Decimal("64.99")),
         ],
         "CAT_121": [  # T-Shirts
-            ("Basic Cotton Tee", ["White", "Black", "Gray", "Navy"], ["XS", "S", "M", "L", "XL", "XXL"], "SUP_002", "BasicBrand", 8.50, 19.99, 14.99),
-            ("Graphic Print Tee", ["Various"], ["S", "M", "L", "XL"], "SUP_002", "GraphicTees", 12.00, 24.99, 18.99),
+            ("Basic Cotton Tee", ["White", "Black", "Gray", "Navy"], ["XS", "S", "M", "L", "XL", "XXL"], "SUP_002", "BasicBrand", Decimal("8.50"), Decimal("19.99"), Decimal("14.99")),
+            ("Graphic Print Tee", ["Various"], ["S", "M", "L", "XL"], "SUP_002", "GraphicTees", Decimal("12.00"), Decimal("24.99"), Decimal("18.99")),
         ],
         "CAT_211": [  # Dress Shirts
-            ("Business Dress Shirt", ["White", "Blue", "Light Blue"], ["S", "M", "L", "XL", "XXL"], "SUP_002", "Professional", 22.00, 49.99, 34.99),
-            ("Oxford Button Down", ["White", "Blue", "Pink"], ["S", "M", "L", "XL"], "SUP_002", "Oxford Co", 25.00, 54.99, 39.99),
+            ("Business Dress Shirt", ["White", "Blue", "Light Blue"], ["S", "M", "L", "XL", "XXL"], "SUP_002", "Professional", Decimal("22.00"), Decimal("49.99"), Decimal("34.99")),
+            ("Oxford Button Down", ["White", "Blue", "Pink"], ["S", "M", "L", "XL"], "SUP_002", "Oxford Co", Decimal("25.00"), Decimal("54.99"), Decimal("39.99")),
         ],
         "CAT_221": [  # Jeans
-            ("Classic Blue Jeans", ["Light Blue", "Dark Blue", "Black"], ["28", "30", "32", "34", "36", "38"], "SUP_002", "DenimCo", 18.00, 59.99, 39.99),
-            ("Skinny Fit Jeans", ["Blue", "Black", "Gray"], ["28", "30", "32", "34", "36"], "SUP_002", "SlimFit", 20.00, 64.99, 44.99),
+            ("Classic Blue Jeans", ["Light Blue", "Dark Blue", "Black"], ["28", "30", "32", "34", "36", "38"], "SUP_002", "DenimCo", Decimal("18.00"), Decimal("59.99"), Decimal("39.99")),
+            ("Skinny Fit Jeans", ["Blue", "Black", "Gray"], ["28", "30", "32", "34", "36"], "SUP_002", "SlimFit", Decimal("20.00"), Decimal("64.99"), Decimal("44.99")),
         ],
-        "CAT_131": [  # Women's Shoes
-            ("Running Sneakers", ["White", "Black", "Pink"], ["6", "7", "8", "9", "10"], "SUP_003", "SportFeet", 35.00, 89.99, 64.99),
-            ("High Heels", ["Black", "Nude", "Red"], ["6", "7", "8", "9"], "SUP_003", "Elegance", 28.00, 79.99, 54.99),
+        "CAT_013": [  # Women's Shoes
+            ("Running Sneakers", ["White", "Black", "Pink"], ["6", "7", "8", "9", "10"], "SUP_003", "SportFeet", Decimal("35.00"), Decimal("89.99"), Decimal("64.99")),
+            ("High Heels", ["Black", "Nude", "Red"], ["6", "7", "8", "9"], "SUP_003", "Elegance", Decimal("28.00"), Decimal("79.99"), Decimal("54.99")),
         ],
         "CAT_051": [  # Smartphones
-            ("Smartphone Pro", ["Black", "White", "Gold"], ["128GB", "256GB"], "SUP_004", "TechBrand", 299.00, 799.99, 599.99),
-            ("Budget Phone", ["Black", "Blue"], ["64GB"], "SUP_004", "ValueTech", 89.00, 199.99, 149.99),
+            ("Smartphone Pro", ["Black", "White", "Gold"], ["128GB", "256GB"], "SUP_004", "TechBrand", Decimal("299.00"), Decimal("799.99"), Decimal("599.99")),
+            ("Budget Phone", ["Black", "Blue"], ["64GB"], "SUP_004", "ValueTech", Decimal("89.00"), Decimal("199.99"), Decimal("149.99")),
         ]
     }
 
@@ -211,7 +264,7 @@ def generate_products(num_products=500):
                         brand,
                         size,
                         color,
-                        round(random.uniform(0.1, 5.0), 2),  # weight
+                        Decimal(str(round(random.uniform(0.1, 5.0), 2))),  # weight
                         cost,
                         retail,
                         wholesale,
@@ -227,14 +280,33 @@ def generate_products(num_products=500):
 
 # Generate products
 products_data = generate_products(300)
-products_columns = ["product_id", "sku", "product_name", "description", "category_id", "supplier_id",
-                   "brand", "size", "color", "weight", "unit_cost", "retail_price", "wholesale_price",
-                   "launch_date", "discontinue_date", "is_seasonal", "season", "is_active"]
 
-products_df = spark.createDataFrame(products_data, products_columns)
+products_schema = StructType([
+    StructField("product_id", StringType(), False),
+    StructField("sku", StringType(), False),
+    StructField("product_name", StringType(), False),
+    StructField("description", StringType(), True),
+    StructField("category_id", StringType(), False),
+    StructField("supplier_id", StringType(), True),
+    StructField("brand", StringType(), True),
+    StructField("size", StringType(), True),
+    StructField("color", StringType(), True),
+    StructField("weight", DecimalType(10,2), True),
+    StructField("unit_cost", DecimalType(10,2), True),
+    StructField("retail_price", DecimalType(10,2), True),
+    StructField("wholesale_price", DecimalType(10,2), True),
+    StructField("launch_date", DateType(), True),
+    StructField("discontinue_date", DateType(), True),
+    StructField("is_seasonal", BooleanType(), True),
+    StructField("season", StringType(), True),
+    StructField("is_active", BooleanType(), True)
+])
+
+products_df = spark.createDataFrame(products_data, products_schema)
 products_df = products_df.withColumn("created_at", F.current_timestamp()).withColumn("updated_at", F.current_timestamp())
 
-products_df.write.mode("overwrite").saveAsTable(f"{catalog_name}.{schema_name}.products")
+products_df.createOrReplaceTempView("temp_products")
+spark.sql(f"INSERT INTO {catalog_name}.{schema_name}.products SELECT * FROM temp_products")
 print(f"Generated {products_df.count()} products")
 
 # COMMAND ----------
@@ -243,6 +315,9 @@ print(f"Generated {products_df.count()} products")
 # MAGIC ## Generate Customers Data
 
 # COMMAND ----------
+
+# Clear existing data from customers table
+spark.sql(f"TRUNCATE TABLE {catalog_name}.{schema_name}.customers")
 
 # Customer generation function
 def generate_customers(num_customers=1000):
@@ -302,14 +377,37 @@ def generate_customers(num_customers=1000):
 
 # Generate customers
 customers_data = generate_customers(1000)
-customers_columns = ["customer_id", "first_name", "last_name", "email", "phone", "date_of_birth", "gender",
-                    "address", "city", "state", "postal_code", "country", "registration_date", "loyalty_tier",
-                    "preferred_store_id", "email_opt_in", "sms_opt_in", "is_active"]
 
-customers_df = spark.createDataFrame(customers_data, customers_columns)
-customers_df = customers_df.withColumn("created_at", F.current_timestamp()).withColumn("updated_at", F.current_timestamp())
+customers_schema = StructType([
+    StructField("customer_id", StringType(), False),
+    StructField("first_name", StringType(), True),
+    StructField("last_name", StringType(), True),
+    StructField("email", StringType(), True),
+    StructField("phone", StringType(), True),
+    StructField("date_of_birth", DateType(), True),
+    StructField("gender", StringType(), True),
+    StructField("address", StringType(), True),
+    StructField("city", StringType(), True),
+    StructField("state", StringType(), True),
+    StructField("postal_code", StringType(), True),
+    StructField("country", StringType(), True),
+    StructField("registration_date", DateType(), True),
+    StructField("loyalty_tier", StringType(), True),
+    StructField("preferred_store_id", StringType(), True),
+    StructField("email_opt_in", BooleanType(), True),
+    StructField("sms_opt_in", BooleanType(), True),
+    StructField("is_active", BooleanType(), True)
+])
 
-customers_df.write.mode("overwrite").saveAsTable(f"{catalog_name}.{schema_name}.customers")
+customers_df = spark.createDataFrame(customers_data, customers_schema)
+customers_df = customers_df.withColumn("email_opt_in", F.when(F.col("email_opt_in").isNull(), F.lit(False)).otherwise(F.col("email_opt_in"))) \
+                         .withColumn("sms_opt_in", F.when(F.col("sms_opt_in").isNull(), F.lit(False)).otherwise(F.col("sms_opt_in"))) \
+                         .withColumn("is_active", F.when(F.col("is_active").isNull(), F.lit(True)).otherwise(F.col("is_active"))) \
+                         .withColumn("created_at", F.current_timestamp()) \
+                         .withColumn("updated_at", F.current_timestamp())
+
+customers_df.createOrReplaceTempView("temp_customers")
+spark.sql(f"INSERT INTO {catalog_name}.{schema_name}.customers SELECT * FROM temp_customers")
 print(f"Generated {customers_df.count()} customers")
 
 # COMMAND ----------
@@ -319,24 +417,42 @@ print(f"Generated {customers_df.count()} customers")
 
 # COMMAND ----------
 
+# Clear existing data from promotions table
+spark.sql(f"TRUNCATE TABLE {catalog_name}.{schema_name}.promotions")
+
 # Promotions data
-start_date = date(2024, 1, 1)
 promotions_data = [
-    ("PROMO_001", "Summer Sale 2024", "Discount", "25% off summer collection", date(2024, 6, 1), date(2024, 8, 31), 25.0, None, 50.0, "CAT_111,CAT_121", None, "All", "All", 50000.0, 200000.0, True),
-    ("PROMO_002", "Back to School", "Discount", "15% off children's items", date(2024, 8, 1), date(2024, 9, 15), 15.0, None, None, None, "CAT_003", "All", "All", 30000.0, 150000.0, True),
-    ("PROMO_003", "Holiday Special", "Discount", "30% off electronics", date(2024, 11, 15), date(2024, 12, 31), 30.0, None, 100.0, None, "CAT_005", "All", "All", 75000.0, 300000.0, True),
-    ("PROMO_004", "Buy One Get One", "BOGO", "Buy one dress, get one 50% off", date(2024, 3, 1), date(2024, 3, 31), None, None, None, None, "CAT_011", "All", "In-Store", 25000.0, 100000.0, True),
-    ("PROMO_005", "Weekend Flash Sale", "Clearance", "40% off select items", date(2024, 5, 10), date(2024, 5, 12), 40.0, None, None, None, None, "All", "Online", 15000.0, 60000.0, False),
+    ("PROMO_001", "Summer Sale 2024", "Discount", "25% off summer collection", date(2024, 6, 1), date(2024, 8, 31), Decimal("25.00"), None, Decimal("50.00"), "CAT_111,CAT_121", None, "All", "All", Decimal("50000.00"), Decimal("200000.00"), True),
+    ("PROMO_002", "Back to School", "Discount", "15% off children's items", date(2024, 8, 1), date(2024, 9, 15), Decimal("15.00"), None, None, None, "CAT_003", "All", "All", Decimal("30000.00"), Decimal("150000.00"), True),
+    ("PROMO_003", "Holiday Special", "Discount", "30% off electronics", date(2024, 11, 15), date(2024, 12, 31), Decimal("30.00"), None, Decimal("100.00"), None, "CAT_005", "All", "All", Decimal("75000.00"), Decimal("300000.00"), True),
+    ("PROMO_004", "Buy One Get One", "BOGO", "Buy one dress, get one 50% off", date(2024, 3, 1), date(2024, 3, 31), None, None, None, None, "CAT_011", "All", "In-Store", Decimal("25000.00"), Decimal("100000.00"), True),
+    ("PROMO_005", "Weekend Flash Sale", "Clearance", "40% off select items", date(2024, 5, 10), date(2024, 5, 12), Decimal("40.00"), None, None, None, None, "All", "Online", Decimal("15000.00"), Decimal("60000.00"), False),
 ]
 
-promotions_columns = ["promotion_id", "promotion_name", "promotion_type", "description", "start_date", "end_date",
-                     "discount_percentage", "discount_amount", "min_purchase_amount", "applicable_products",
-                     "applicable_categories", "applicable_stores", "channel", "budget", "target_revenue", "is_active"]
+promotions_schema = StructType([
+    StructField("promotion_id", StringType(), False),
+    StructField("promotion_name", StringType(), False),
+    StructField("promotion_type", StringType(), True),
+    StructField("description", StringType(), True),
+    StructField("start_date", DateType(), False),
+    StructField("end_date", DateType(), False),
+    StructField("discount_percentage", DecimalType(5,2), True),
+    StructField("discount_amount", DecimalType(10,2), True),
+    StructField("min_purchase_amount", DecimalType(10,2), True),
+    StructField("applicable_products", StringType(), True),
+    StructField("applicable_categories", StringType(), True),
+    StructField("applicable_stores", StringType(), True),
+    StructField("channel", StringType(), True),
+    StructField("budget", DecimalType(15,2), True),
+    StructField("target_revenue", DecimalType(15,2), True),
+    StructField("is_active", BooleanType(), True)
+])
 
-promotions_df = spark.createDataFrame(promotions_data, promotions_columns)
+promotions_df = spark.createDataFrame(promotions_data, promotions_schema)
 promotions_df = promotions_df.withColumn("created_at", F.current_timestamp()).withColumn("updated_at", F.current_timestamp())
 
-promotions_df.write.mode("overwrite").saveAsTable(f"{catalog_name}.{schema_name}.promotions")
+promotions_df.createOrReplaceTempView("temp_promotions")
+spark.sql(f"INSERT INTO {catalog_name}.{schema_name}.promotions SELECT * FROM temp_promotions")
 print(f"Generated {promotions_df.count()} promotions")
 
 # COMMAND ----------
@@ -345,6 +461,9 @@ print(f"Generated {promotions_df.count()} promotions")
 # MAGIC ## Generate Sales Data
 
 # COMMAND ----------
+
+# Clear existing data from sales table
+spark.sql(f"TRUNCATE TABLE {catalog_name}.{schema_name}.sales")
 
 # Generate sales transactions
 def generate_sales_transactions(num_transactions=10000):
@@ -422,10 +541,10 @@ def generate_sales_transactions(num_transactions=10000):
             product_id,
             sku,
             quantity,
-            retail_price,
-            round(discount_amount, 2),
-            round(tax_amount, 2),
-            round(total_amount, 2),
+            Decimal(str(round(retail_price, 2))),
+            Decimal(str(round(discount_amount, 2))),
+            Decimal(str(round(tax_amount, 2))),
+            Decimal(str(round(total_amount, 2))),
             payment_method,
             promotion_id,
             f"EMP_{random.randint(1, 50):03d}",
@@ -438,14 +557,36 @@ def generate_sales_transactions(num_transactions=10000):
 # Generate sales data
 print("Generating sales transactions...")
 sales_data = generate_sales_transactions(10000)
-sales_columns = ["transaction_id", "sale_date", "sale_timestamp", "store_id", "customer_id", "product_id", "sku",
-                "quantity", "unit_price", "discount_amount", "tax_amount", "total_amount", "payment_method",
-                "promotion_id", "sales_associate_id", "channel", "return_flag"]
 
-sales_df = spark.createDataFrame(sales_data, sales_columns)
-sales_df = sales_df.withColumn("created_at", F.current_timestamp())
+sales_schema = StructType([
+    StructField("transaction_id", StringType(), False),
+    StructField("sale_date", DateType(), False),
+    StructField("sale_timestamp", TimestampType(), False),
+    StructField("store_id", StringType(), False),
+    StructField("customer_id", StringType(), True),
+    StructField("product_id", StringType(), False),
+    StructField("sku", StringType(), False),
+    StructField("quantity", IntegerType(), False),
+    StructField("unit_price", DecimalType(10,2), False),
+    StructField("discount_amount", DecimalType(10,2), True),
+    StructField("tax_amount", DecimalType(10,2), True),
+    StructField("total_amount", DecimalType(10,2), False),
+    StructField("payment_method", StringType(), True),
+    StructField("promotion_id", StringType(), True),
+    StructField("sales_associate_id", StringType(), True),
+    StructField("channel", StringType(), True),
+    StructField("return_flag", BooleanType(), True)
+])
 
-sales_df.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(f"{catalog_name}.{schema_name}.sales")
+sales_df = spark.createDataFrame(sales_data, sales_schema)
+sales_df = sales_df.withColumn("discount_amount", F.when(F.col("discount_amount").isNull(), F.lit(Decimal("0.00"))).otherwise(F.col("discount_amount"))) \
+                 .withColumn("tax_amount", F.when(F.col("tax_amount").isNull(), F.lit(Decimal("0.00"))).otherwise(F.col("tax_amount"))) \
+                 .withColumn("channel", F.when(F.col("channel").isNull(), F.lit("In-Store")).otherwise(F.col("channel"))) \
+                 .withColumn("return_flag", F.when(F.col("return_flag").isNull(), F.lit(False)).otherwise(F.col("return_flag"))) \
+                 .withColumn("created_at", F.current_timestamp())
+
+sales_df.createOrReplaceTempView("temp_sales")
+spark.sql(f"INSERT INTO {catalog_name}.{schema_name}.sales SELECT * FROM temp_sales")
 print(f"Generated {sales_df.count()} sales transactions")
 
 # COMMAND ----------
@@ -454,6 +595,9 @@ print(f"Generated {sales_df.count()} sales transactions")
 # MAGIC ## Generate Inventory Data
 
 # COMMAND ----------
+
+# Clear existing data from inventory table
+spark.sql(f"TRUNCATE TABLE {catalog_name}.{schema_name}.inventory")
 
 # Generate inventory data for the last 30 days
 def generate_inventory_data():
@@ -534,15 +678,43 @@ def generate_inventory_data():
 # Generate inventory data
 print("Generating inventory data...")
 inventory_data = generate_inventory_data()
-inventory_columns = ["inventory_date", "store_id", "product_id", "sku", "beginning_inventory", "received_quantity",
-                    "sold_quantity", "transferred_out", "transferred_in", "shrinkage", "ending_inventory",
-                    "safety_stock", "reorder_point", "max_stock", "last_received_date", "last_sold_date",
-                    "days_on_hand", "stockout_flag", "overstock_flag"]
 
-inventory_df = spark.createDataFrame(inventory_data, inventory_columns)
-inventory_df = inventory_df.withColumn("created_at", F.current_timestamp()).withColumn("updated_at", F.current_timestamp())
+inventory_schema = StructType([
+    StructField("inventory_date", DateType(), False),
+    StructField("store_id", StringType(), False),
+    StructField("product_id", StringType(), False),
+    StructField("sku", StringType(), False),
+    StructField("beginning_inventory", IntegerType(), True),
+    StructField("received_quantity", IntegerType(), True),
+    StructField("sold_quantity", IntegerType(), True),
+    StructField("transferred_out", IntegerType(), True),
+    StructField("transferred_in", IntegerType(), True),
+    StructField("shrinkage", IntegerType(), True),
+    StructField("ending_inventory", IntegerType(), True),
+    StructField("safety_stock", IntegerType(), True),
+    StructField("reorder_point", IntegerType(), True),
+    StructField("max_stock", IntegerType(), True),
+    StructField("last_received_date", DateType(), True),
+    StructField("last_sold_date", DateType(), True),
+    StructField("days_on_hand", IntegerType(), True),
+    StructField("stockout_flag", BooleanType(), True),
+    StructField("overstock_flag", BooleanType(), True)
+])
 
-inventory_df.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(f"{catalog_name}.{schema_name}.inventory")
+inventory_df = spark.createDataFrame(inventory_data, inventory_schema)
+# Handle defaults at application layer for nullable integer columns
+default_zero_cols = ["beginning_inventory", "received_quantity", "sold_quantity", "transferred_out",
+                    "transferred_in", "shrinkage", "ending_inventory", "safety_stock", "reorder_point", "max_stock"]
+for col_name in default_zero_cols:
+    inventory_df = inventory_df.withColumn(col_name, F.when(F.col(col_name).isNull(), F.lit(0)).otherwise(F.col(col_name)))
+
+inventory_df = inventory_df.withColumn("stockout_flag", F.when(F.col("stockout_flag").isNull(), F.lit(False)).otherwise(F.col("stockout_flag"))) \
+                         .withColumn("overstock_flag", F.when(F.col("overstock_flag").isNull(), F.lit(False)).otherwise(F.col("overstock_flag"))) \
+                         .withColumn("created_at", F.current_timestamp()) \
+                         .withColumn("updated_at", F.current_timestamp())
+
+inventory_df.createOrReplaceTempView("temp_inventory")
+spark.sql(f"INSERT INTO {catalog_name}.{schema_name}.inventory SELECT * FROM temp_inventory")
 print(f"Generated {inventory_df.count()} inventory records")
 
 # COMMAND ----------
@@ -602,4 +774,4 @@ print(f"Unique Customers: {sales_checks['unique_customers']:,}")
 print(f"Stores with Sales: {sales_checks['stores_with_sales']}")
 print(f"Products Sold: {sales_checks['products_sold']}")
 
-print("\nData quality checks passed! ✅")
+print("\nData quality checks passed!")
