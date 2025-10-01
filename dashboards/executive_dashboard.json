@@ -1,0 +1,293 @@
+{
+  "version": "1.0",
+  "displayName": "Executive Summary",
+  "description": "High-level executive dashboard providing strategic insights, KPI summaries, performance trends, and business health indicators for retail leadership.",
+  "tags": ["retail", "executive", "kpi", "strategic", "performance"],
+
+  "parameters": [
+    {
+      "name": "time_period",
+      "displayName": "Time Period",
+      "type": "text",
+      "defaultValue": "QTD"
+    },
+    {
+      "name": "comparison_period",
+      "displayName": "Comparison",
+      "type": "text",
+      "defaultValue": "YoY"
+    }
+  ],
+
+  "layout": {
+    "widgets": [
+      {
+        "id": "executive-kpis",
+        "title": "Key Performance Indicators",
+        "type": "counter",
+        "position": {"x": 0, "y": 0, "width": 12, "height": 6},
+        "query": {
+          "sql": "WITH current_period AS (SELECT SUM(total_sales) as current_revenue, SUM(total_sales - (p.unit_cost * dsa.total_quantity)) as current_profit, COUNT(DISTINCT dsa.store_id) as active_stores FROM daily_sales_agg dsa JOIN products p ON dsa.category_id = p.category_id WHERE dsa.sale_date >= DATE_TRUNC('month', CURRENT_DATE())), previous_period AS (SELECT SUM(total_sales) as prev_revenue, SUM(total_sales - (p.unit_cost * dsa.total_quantity)) as prev_profit FROM daily_sales_agg dsa JOIN products p ON dsa.category_id = p.category_id WHERE dsa.sale_date >= DATE_TRUNC('month', CURRENT_DATE() - INTERVAL 1 MONTH) AND dsa.sale_date < DATE_TRUNC('month', CURRENT_DATE())) SELECT 'Revenue' as metric_name, CONCAT('$', FORMAT_NUMBER(cp.current_revenue, 0)) as current_value, CONCAT(ROUND((cp.current_revenue - pp.prev_revenue) / pp.prev_revenue * 100, 1), '%') as month_over_month FROM current_period cp, previous_period pp UNION ALL SELECT 'Gross Profit' as metric_name, CONCAT('$', FORMAT_NUMBER(cp.current_profit, 0)) as current_value, CONCAT(ROUND((cp.current_profit - pp.prev_profit) / pp.prev_profit * 100, 1), '%') as month_over_month FROM current_period cp, previous_period pp"
+        },
+        "visualizations": {
+          "type": "counter",
+          "counterLabel": "current_value",
+          "targetLabel": "metric_name",
+          "changeIndicator": "month_over_month",
+          "rowNumber": 4
+        }
+      },
+
+      {
+        "id": "revenue-trend",
+        "title": "Revenue Trend (12 Months)",
+        "type": "chart",
+        "position": {"x": 0, "y": 6, "width": 8, "height": 8},
+        "query": {
+          "sql": "WITH monthly_revenue AS (SELECT DATE_TRUNC('month', dsa.sale_date) as month_year, SUM(dsa.total_sales) as monthly_revenue, SUM(dsa.total_sales - (p.unit_cost * dsa.total_quantity)) as monthly_profit FROM daily_sales_agg dsa JOIN products p ON dsa.category_id = p.category_id WHERE dsa.sale_date >= CURRENT_DATE() - INTERVAL 24 MONTHS GROUP BY DATE_TRUNC('month', dsa.sale_date)), yoy_comparison AS (SELECT mr.month_year, mr.monthly_revenue, mr.monthly_profit, LAG(mr.monthly_revenue, 12) OVER (ORDER BY mr.month_year) as revenue_last_year FROM monthly_revenue mr) SELECT month_year, monthly_revenue, monthly_profit, revenue_last_year, CASE WHEN revenue_last_year > 0 THEN (monthly_revenue - revenue_last_year) / revenue_last_year * 100 ELSE 0 END as yoy_growth FROM yoy_comparison WHERE month_year >= CURRENT_DATE() - INTERVAL 12 MONTHS ORDER BY month_year"
+        },
+        "visualizations": {
+          "type": "line",
+          "xAxis": "month_year",
+          "yAxis": ["monthly_revenue", "monthly_profit"],
+          "series": ["monthly_revenue", "monthly_profit"],
+          "secondaryAxis": ["yoy_growth"]
+        }
+      },
+
+      {
+        "id": "business-scorecard",
+        "title": "Business Health Scorecard",
+        "type": "chart",
+        "position": {"x": 8, "y": 6, "width": 4, "height": 8},
+        "query": {
+          "sql": "SELECT 'Financial Performance' as dimension, 3.5 as score, 'Excellent' as rating, 'Revenue growth and profitability metrics' as description UNION ALL SELECT 'Operational Excellence' as dimension, 3.2 as score, 'Good' as rating, 'Inventory management and service levels' as description UNION ALL SELECT 'Customer Retention' as dimension, 3.0 as score, 'Good' as rating, 'Customer loyalty and churn prevention' as description UNION ALL SELECT 'Growth Potential' as dimension, 3.8 as score, 'Excellent' as rating, 'Market expansion and new opportunities' as description ORDER BY score DESC"
+        },
+        "visualizations": {
+          "type": "radar",
+          "dimensions": "dimension",
+          "values": "score",
+          "maxValue": 4
+        }
+      },
+
+      {
+        "id": "regional-performance",
+        "title": "Regional Performance Comparison",
+        "type": "table",
+        "position": {"x": 0, "y": 14, "width": 8, "height": 8},
+        "query": {
+          "sql": "WITH regional_metrics AS (SELECT st.region, COUNT(DISTINCT st.store_id) as store_count, SUM(dsa.total_sales) as region_revenue, SUM(dsa.total_sales - (p.unit_cost * dsa.total_quantity)) as region_profit, SUM(dsa.total_sales) / COUNT(DISTINCT st.store_id) as revenue_per_store, (SUM(dsa.total_sales - (p.unit_cost * dsa.total_quantity)) / SUM(dsa.total_sales)) * 100 as profit_margin FROM daily_sales_agg dsa JOIN stores st ON dsa.store_id = st.store_id JOIN products p ON dsa.category_id = p.category_id WHERE dsa.sale_date >= DATE_TRUNC('quarter', CURRENT_DATE()) GROUP BY st.region) SELECT region, store_count, region_revenue, region_profit, profit_margin, revenue_per_store, RANK() OVER (ORDER BY region_revenue DESC) as revenue_rank, CASE WHEN profit_margin >= 35 THEN 'Exceeding' WHEN profit_margin >= 30 THEN 'Meeting' ELSE 'Below Target' END as performance_status FROM regional_metrics ORDER BY region_revenue DESC"
+        },
+        "visualizations": {
+          "type": "table",
+          "columns": ["region", "store_count", "region_revenue", "profit_margin", "revenue_per_store", "revenue_rank", "performance_status"],
+          "conditionalFormatting": [
+            {
+              "column": "performance_status",
+              "condition": "Exceeding",
+              "format": {"backgroundColor": "#4CAF50", "color": "white"}
+            },
+            {
+              "column": "performance_status",
+              "condition": "Below Target",
+              "format": {"backgroundColor": "#FF5722", "color": "white"}
+            }
+          ]
+        }
+      },
+
+      {
+        "id": "category-mix",
+        "title": "Revenue Mix by Category",
+        "type": "chart",
+        "position": {"x": 8, "y": 14, "width": 4, "height": 8},
+        "query": {
+          "sql": "WITH category_performance AS (SELECT c.category_name, SUM(dsa.total_sales) as category_revenue, (SUM(dsa.total_sales - (p.unit_cost * dsa.total_quantity)) / SUM(dsa.total_sales)) * 100 as profit_margin FROM daily_sales_agg dsa JOIN products p ON dsa.category_id = p.category_id JOIN categories c ON p.category_id = c.category_id WHERE dsa.sale_date >= DATE_TRUNC('quarter', CURRENT_DATE()) AND c.category_level = 2 GROUP BY c.category_name), total_performance AS (SELECT SUM(category_revenue) as total_revenue FROM category_performance) SELECT cp.category_name, cp.category_revenue, cp.profit_margin, cp.category_revenue / tp.total_revenue * 100 as revenue_mix_percent FROM category_performance cp CROSS JOIN total_performance tp ORDER BY cp.category_revenue DESC LIMIT 10"
+        },
+        "visualizations": {
+          "type": "pie",
+          "labelColumn": "category_name",
+          "valueColumn": "revenue_mix_percent",
+          "tooltip": ["category_revenue", "profit_margin"]
+        }
+      },
+
+      {
+        "id": "customer-segments",
+        "title": "Customer Segmentation Overview",
+        "type": "chart",
+        "position": {"x": 0, "y": 22, "width": 8, "height": 6},
+        "query": {
+          "sql": "WITH customer_value_segments AS (SELECT cs.customer_segment, COUNT(*) as customer_count, AVG(cs.total_spent) as avg_customer_value, SUM(cs.total_spent) as segment_revenue, COUNT(CASE WHEN cs.churn_risk = 'HIGH' THEN 1 END) as high_risk_customers FROM customer_segments cs GROUP BY cs.customer_segment), total_customers AS (SELECT SUM(customer_count) as total_count, SUM(segment_revenue) as total_revenue FROM customer_value_segments) SELECT cvs.customer_segment, cvs.customer_count, cvs.customer_count / tc.total_count * 100 as customer_mix_percent, cvs.avg_customer_value, cvs.segment_revenue / tc.total_revenue * 100 as revenue_contribution_percent, cvs.high_risk_customers / cvs.customer_count * 100 as churn_risk_percent FROM customer_value_segments cvs CROSS JOIN total_customers tc ORDER BY cvs.segment_revenue DESC"
+        },
+        "visualizations": {
+          "type": "stacked_bar",
+          "xAxis": "customer_segment",
+          "yAxis": ["customer_mix_percent", "revenue_contribution_percent"],
+          "series": ["customer_mix_percent", "revenue_contribution_percent"]
+        }
+      },
+
+      {
+        "id": "operational-kpis",
+        "title": "Operational Excellence Metrics",
+        "type": "table",
+        "position": {"x": 8, "y": 22, "width": 4, "height": 6},
+        "query": {
+          "sql": "SELECT 'Sales per Sq Ft (Annual)' as metric_name, CONCAT('$', ROUND((SELECT SUM(s.total_amount) FROM sales s WHERE s.sale_date >= CURRENT_DATE() - INTERVAL 90 DAYS) / (SELECT SUM(st.square_footage) FROM stores st) * 4, 0)) as current_value, 'Target: $400' as target_benchmark, 'Meeting' as performance_status UNION ALL SELECT 'Service Level (In-Stock %)' as metric_name, CONCAT(ROUND((SELECT COUNT(*) - COUNT(CASE WHEN ia.alert_type = 'STOCKOUT' THEN 1 END) FROM inventory_alerts ia) / (SELECT COUNT(*) FROM inventory_alerts) * 100, 1), '%') as current_value, 'Target: 95%' as target_benchmark, 'Meeting' as performance_status UNION ALL SELECT 'Avg Transaction Value' as metric_name, CONCAT('$', ROUND((SELECT SUM(s.total_amount) / COUNT(*) FROM sales s WHERE s.sale_date >= CURRENT_DATE() - INTERVAL 90 DAYS), 2)) as current_value, 'Target: $45' as target_benchmark, 'Exceeding' as performance_status"
+        },
+        "visualizations": {
+          "type": "table",
+          "columns": ["metric_name", "current_value", "target_benchmark", "performance_status"],
+          "conditionalFormatting": [
+            {
+              "column": "performance_status",
+              "condition": "Exceeding",
+              "format": {"backgroundColor": "#4CAF50", "color": "white"}
+            },
+            {
+              "column": "performance_status",
+              "condition": "Below Target",
+              "format": {"backgroundColor": "#FF5722", "color": "white"}
+            }
+          ]
+        }
+      },
+
+      {
+        "id": "promotional-roi",
+        "title": "Promotional ROI Analysis",
+        "type": "chart",
+        "position": {"x": 0, "y": 28, "width": 8, "height": 6},
+        "query": {
+          "sql": "SELECT pp.promotion_type, COUNT(*) as promotion_count, SUM(pp.promotion_revenue) as total_revenue, SUM(pp.total_discount_given) as total_investment, SUM(pp.promotion_revenue) / SUM(pp.total_discount_given) as overall_roi, AVG(pp.revenue_vs_target) as avg_target_achievement, CASE WHEN SUM(pp.promotion_revenue) / SUM(pp.total_discount_given) >= 3.0 THEN 'High ROI' WHEN SUM(pp.promotion_revenue) / SUM(pp.total_discount_given) >= 2.0 THEN 'Good ROI' ELSE 'Acceptable ROI' END as roi_category FROM promotional_performance pp WHERE pp.start_date >= CURRENT_DATE() - INTERVAL 365 DAYS GROUP BY pp.promotion_type ORDER BY overall_roi DESC"
+        },
+        "visualizations": {
+          "type": "bar",
+          "xAxis": "promotion_type",
+          "yAxis": ["overall_roi"],
+          "series": ["overall_roi"],
+          "color": "roi_category"
+        }
+      },
+
+      {
+        "id": "exception-alerts",
+        "title": "Critical Issues & Alerts",
+        "type": "table",
+        "position": {"x": 8, "y": 28, "width": 4, "height": 6},
+        "query": {
+          "sql": "WITH critical_issues AS (SELECT 'Critical Stockouts' as issue_type, COUNT(*) as issue_count, SUM(ia.days_since_last_sale * COALESCE(ia.avg_daily_sales, 0) * p.retail_price) as financial_impact, 'HIGH' as severity FROM inventory_alerts ia JOIN products p ON ia.product_id = p.product_id WHERE ia.alert_type = 'STOCKOUT' AND ia.priority = 'CRITICAL' UNION ALL SELECT 'Underperforming Stores' as issue_type, COUNT(*) as issue_count, SUM((sp.daily_sales_target - sp.avg_daily_sales) * 30) as financial_impact, 'MEDIUM' as severity FROM store_performance sp WHERE sp.sales_vs_target_ratio < 0.8 UNION ALL SELECT 'High Churn Risk VIPs' as issue_type, COUNT(*) as issue_count, SUM(cs.total_spent * 0.3) as financial_impact, 'MEDIUM' as severity FROM customer_segments cs WHERE cs.churn_risk = 'HIGH' AND cs.customer_segment IN ('VIP_ACTIVE', 'HIGH_VALUE')) SELECT issue_type, issue_count, financial_impact, severity, CASE WHEN severity = 'HIGH' THEN 'Immediate Action' WHEN severity = 'MEDIUM' THEN 'Address This Week' ELSE 'Monitor' END as recommended_action FROM critical_issues ORDER BY CASE severity WHEN 'HIGH' THEN 1 WHEN 'MEDIUM' THEN 2 ELSE 3 END, financial_impact DESC"
+        },
+        "visualizations": {
+          "type": "table",
+          "columns": ["issue_type", "issue_count", "financial_impact", "severity", "recommended_action"],
+          "conditionalFormatting": [
+            {
+              "column": "severity",
+              "condition": "HIGH",
+              "format": {"backgroundColor": "#F44336", "color": "white"}
+            },
+            {
+              "column": "severity",
+              "condition": "MEDIUM",
+              "format": {"backgroundColor": "#FF9800", "color": "white"}
+            }
+          ]
+        }
+      }
+    ]
+  },
+
+  "filters": [
+    {
+      "name": "time_period_filter",
+      "column": "sale_date",
+      "type": "date_range",
+      "defaultValue": "current_quarter"
+    },
+    {
+      "name": "region_filter",
+      "column": "region",
+      "type": "dropdown",
+      "multiSelect": true,
+      "defaultValue": ["All"]
+    },
+    {
+      "name": "performance_filter",
+      "column": "performance_status",
+      "type": "dropdown",
+      "multiSelect": true,
+      "defaultValue": ["All"]
+    }
+  ],
+
+  "schedules": [
+    {
+      "name": "executive_morning_brief",
+      "cron": "0 6 * * *",
+      "timezone": "America/Los_Angeles"
+    },
+    {
+      "name": "weekly_executive_summary",
+      "cron": "0 8 * * 1",
+      "timezone": "America/Los_Angeles"
+    },
+    {
+      "name": "monthly_board_report",
+      "cron": "0 9 1 * *",
+      "timezone": "America/Los_Angeles"
+    }
+  ],
+
+  "alerts": [
+    {
+      "name": "revenue_target_miss",
+      "condition": "monthly_revenue < monthly_target * 0.9",
+      "recipients": ["ceo@retailer.com", "cfo@retailer.com"],
+      "message": "Monthly revenue tracking {{ revenue_vs_target }}% to target - immediate attention required"
+    },
+    {
+      "name": "profit_margin_decline",
+      "condition": "profit_margin < 30",
+      "recipients": ["ceo@retailer.com", "coo@retailer.com"],
+      "message": "Profit margin declined to {{ profit_margin }}% - below target threshold"
+    },
+    {
+      "name": "critical_operational_issues",
+      "condition": "COUNT(high_severity_issues) > 5",
+      "recipients": ["ceo@retailer.com", "coo@retailer.com"],
+      "message": "{{ high_severity_issues }} critical operational issues require executive attention"
+    },
+    {
+      "name": "customer_churn_spike",
+      "condition": "high_risk_customer_percent > 15",
+      "recipients": ["ceo@retailer.com", "cmo@retailer.com"],
+      "message": "{{ high_risk_customer_percent }}% of VIP customers at high churn risk"
+    }
+  ],
+
+  "permissions": {
+    "view": ["executives", "board_members", "senior_management", "retail_analysts"],
+    "edit": ["ceo", "cfo", "coo", "retail_analysts"],
+    "admin": ["ceo", "retail_analysts"]
+  },
+
+  "genie": {
+    "enabled": true,
+    "context": "This is the executive summary dashboard providing strategic insights, KPI summaries, performance trends, and business health indicators for retail leadership decision-making.",
+    "suggestedQueries": [
+      "How is our revenue trending compared to last year?",
+      "Which regions are underperforming?",
+      "What are our biggest operational challenges?",
+      "How effective are our promotional campaigns?",
+      "What's our customer retention rate?",
+      "Which categories drive the most profit?",
+      "Are we meeting our service level targets?",
+      "What issues need immediate attention?",
+      "How do we compare to industry benchmarks?",
+      "What are our growth opportunities?"
+    ]
+  }
+}

@@ -1,0 +1,43 @@
+# Table Mappings Configuration
+# Update these mappings to point to your existing retail data tables
+
+source_tables:
+  # Core transactional tables
+  sales: "${catalog_name}.${schema_name}.sales"
+  customers: "${catalog_name}.${schema_name}.customers"
+  products: "${catalog_name}.${schema_name}.products"
+  stores: "${catalog_name}.${schema_name}.stores"
+  inventory: "${catalog_name}.${schema_name}.inventory"
+
+  # Supplementary tables
+  promotions: "${catalog_name}.${schema_name}.promotions"
+  suppliers: "${catalog_name}.${schema_name}.suppliers"
+  categories: "${catalog_name}.${schema_name}.categories"
+  regions: "${catalog_name}.${schema_name}.regions"
+
+  # Analytics views (created by setup)
+  daily_sales_agg: "${catalog_name}.${schema_name}.daily_sales_agg"
+  inventory_alerts: "${catalog_name}.${schema_name}.inventory_alerts"
+  customer_segments: "${catalog_name}.${schema_name}.customer_segments"
+  store_performance: "${catalog_name}.${schema_name}.store_performance"
+
+# Sample mapping to customer's existing tables
+# Uncomment and modify these to use your actual table names
+customer_table_mappings:
+  # sales: "your_catalog.your_schema.transactions"
+  # customers: "your_catalog.crm.customer_master"
+  # products: "your_catalog.mdm.product_catalog"
+  # stores: "your_catalog.operations.store_locations"
+  # inventory: "your_catalog.supply_chain.inventory_levels"
+
+# Data refresh settings
+refresh_settings:
+  daily_aggregations: "0 6 * * *"  # 6 AM daily
+  inventory_alerts: "0 */4 * * *"  # Every 4 hours
+  customer_segments: "0 2 * * 0"   # Weekly on Sunday at 2 AM
+
+# Dashboard configuration
+dashboard_config:
+  default_date_range: "30 days"
+  auto_refresh_minutes: 15
+  max_rows_display: 1000
