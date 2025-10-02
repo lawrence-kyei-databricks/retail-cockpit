@@ -1,256 +1,157 @@
 {
-  "version": "1.0",
-  "displayName": "Store Manager Cockpit",
-  "description": "Comprehensive dashboard for store managers to track daily operations, sales performance, inventory alerts, and customer metrics.",
-  "tags": ["retail", "store-manager", "operations", "daily-performance"],
-
-  "parameters": [
-    {
-      "name": "store_id",
-      "displayName": "Store ID",
-      "type": "text",
-      "defaultValue": "STORE_001"
-    },
-    {
-      "name": "date_range",
-      "displayName": "Date Range",
-      "type": "text",
-      "defaultValue": "30"
-    }
-  ],
-
-  "layout": {
+  "version": "v2",
+  "dashboard": {
+    "display_name": "Store Manager Cockpit",
+    "description": "Real-time operational dashboard for store managers with sales performance, inventory alerts, and customer metrics",
+    "tags": ["retail", "store-operations", "real-time"],
     "widgets": [
       {
-        "id": "performance-summary",
-        "title": "Sales Performance Summary",
-        "type": "counter",
-        "position": {"x": 0, "y": 0, "width": 12, "height": 4},
-        "query": {
-          "sql": "SELECT 'Today' as period, COALESCE(SUM(total_sales), 0) as actual_sales, MAX(daily_sales_target) as target_sales, COALESCE(SUM(total_sales), 0) / MAX(daily_sales_target) as performance_ratio, CASE WHEN COALESCE(SUM(total_sales), 0) / MAX(daily_sales_target) >= 1.1 THEN 'Excellent' WHEN COALESCE(SUM(total_sales), 0) / MAX(daily_sales_target) >= 1.0 THEN 'On Target' WHEN COALESCE(SUM(total_sales), 0) / MAX(daily_sales_target) >= 0.9 THEN 'Close' ELSE 'Below Target' END as status FROM daily_sales_agg dsa JOIN store_performance sp ON dsa.store_id = sp.store_id WHERE dsa.sale_date = CURRENT_DATE() AND dsa.store_id = '{{ store_id }}'"
+        "id": "sales_kpis",
+        "title": "Today's Sales Performance",
+        "description": "Key sales metrics for today vs targets",
+        "widget_type": "counter",
+        "position": {
+          "size_x": 6,
+          "size_y": 2,
+          "row": 0,
+          "col": 0
         },
-        "visualizations": {
-          "type": "counter",
+        "options": {
           "counterLabel": "Today's Sales",
-          "targetLabel": "vs Target",
-          "rowNumber": 1
+          "counterValue": "SELECT COALESCE(SUM(total_sales), 0) as today_sales FROM daily_sales_agg WHERE sale_date = CURRENT_DATE() AND store_id = '{{ store_filter }}'"
         }
       },
-
       {
-        "id": "daily-trend",
-        "title": "7-Day Sales Trend",
-        "type": "chart",
-        "position": {"x": 0, "y": 4, "width": 8, "height": 6},
-        "query": {
-          "sql": "SELECT sale_date, SUM(total_sales) as daily_sales, COUNT(transaction_count) as transactions FROM daily_sales_agg WHERE sale_date >= CURRENT_DATE() - INTERVAL 7 DAYS AND store_id = '{{ store_id }}' GROUP BY sale_date ORDER BY sale_date"
+        "id": "sales_target",
+        "title": "Sales vs Target",
+        "description": "Performance against daily target",
+        "widget_type": "counter",
+        "position": {
+          "size_x": 6,
+          "size_y": 2,
+          "row": 0,
+          "col": 6
         },
-        "visualizations": {
-          "type": "line",
-          "xAxis": "sale_date",
-          "yAxis": ["daily_sales"],
-          "series": ["daily_sales"]
+        "options": {
+          "counterLabel": "Target Achievement",
+          "counterValue": "SELECT ROUND(avg_daily_sales / daily_sales_target * 100, 1) as target_pct FROM store_performance WHERE store_id = '{{ store_filter }}'"
         }
       },
-
       {
-        "id": "hourly-pattern",
-        "title": "Hourly Sales Pattern (Last 7 Days)",
-        "type": "chart",
-        "position": {"x": 8, "y": 4, "width": 4, "height": 6},
-        "query": {
-          "sql": "SELECT HOUR(sale_timestamp) as hour_of_day, AVG(total_amount) as avg_transaction_value, COUNT(*) as transaction_count, SUM(total_amount) as total_sales FROM sales WHERE sale_date >= CURRENT_DATE() - INTERVAL 7 DAYS AND store_id = '{{ store_id }}' GROUP BY HOUR(sale_timestamp) ORDER BY hour_of_day"
+        "id": "daily_trend",
+        "title": "Daily Sales Trend (Last 30 Days)",
+        "description": "Sales performance over time",
+        "widget_type": "chart",
+        "position": {
+          "size_x": 12,
+          "size_y": 4,
+          "row": 2,
+          "col": 0
         },
-        "visualizations": {
-          "type": "bar",
-          "xAxis": "hour_of_day",
-          "yAxis": ["total_sales"],
-          "series": ["total_sales"]
-        }
-      },
-
-      {
-        "id": "inventory-alerts",
-        "title": "Critical Inventory Alerts",
-        "type": "table",
-        "position": {"x": 0, "y": 10, "width": 6, "height": 8},
-        "query": {
-          "sql": "SELECT ia.product_name, ia.sku, ia.category_name, ia.ending_inventory, ia.safety_stock, ia.alert_type, ia.priority, CASE WHEN ia.avg_daily_sales > 0 THEN ia.ending_inventory / ia.avg_daily_sales ELSE 999 END as days_of_stock FROM inventory_alerts ia WHERE ia.store_id = '{{ store_id }}' AND ia.priority IN ('CRITICAL', 'HIGH') ORDER BY CASE ia.priority WHEN 'CRITICAL' THEN 1 WHEN 'HIGH' THEN 2 ELSE 3 END, ia.ending_inventory ASC"
-        },
-        "visualizations": {
-          "type": "table",
-          "columns": ["product_name", "sku", "alert_type", "ending_inventory", "days_of_stock"],
-          "conditionalFormatting": [
-            {
-              "column": "alert_type",
-              "condition": "STOCKOUT",
-              "format": {"backgroundColor": "#ff4444", "color": "white"}
-            },
-            {
-              "column": "alert_type",
-              "condition": "LOW_STOCK",
-              "format": {"backgroundColor": "#ffaa44", "color": "white"}
+        "options": {
+          "globalSeriesType": "line",
+          "xAxis": {
+            "type": "datetime",
+            "labels": {
+              "enabled": true
             }
-          ]
-        }
-      },
-
-      {
-        "id": "top-products",
-        "title": "Top 10 Products (Last 30 Days)",
-        "type": "table",
-        "position": {"x": 6, "y": 10, "width": 6, "height": 8},
-        "query": {
-          "sql": "SELECT p.product_name, p.sku, c.category_name, SUM(s.quantity) as units_sold, SUM(s.total_amount) as revenue, AVG(s.total_amount / s.quantity) as avg_selling_price FROM sales s JOIN products p ON s.product_id = p.product_id JOIN categories c ON p.category_id = c.category_id WHERE s.sale_date >= CURRENT_DATE() - INTERVAL 30 DAYS AND s.store_id = '{{ store_id }}' GROUP BY p.product_name, p.sku, c.category_name ORDER BY revenue DESC LIMIT 10"
+          },
+          "yAxis": [
+            {
+              "type": "linear"
+            }
+          ],
+          "series": {
+            "stacking": null
+          }
         },
-        "visualizations": {
-          "type": "table",
-          "columns": ["product_name", "category_name", "units_sold", "revenue", "avg_selling_price"]
-        }
+        "query": "SELECT sale_date, SUM(total_sales) as daily_sales FROM daily_sales_agg WHERE sale_date >= CURRENT_DATE() - INTERVAL 30 DAYS AND store_id = '{{ store_filter }}' GROUP BY sale_date ORDER BY sale_date"
       },
-
       {
-        "id": "customer-metrics",
-        "title": "Customer Traffic & Conversion",
-        "type": "chart",
-        "position": {"x": 0, "y": 18, "width": 8, "height": 6},
-        "query": {
-          "sql": "SELECT sale_date, COUNT(DISTINCT transaction_id) as transactions, COUNT(DISTINCT customer_id) as unique_customers, SUM(total_amount) as daily_sales, AVG(total_amount) as avg_transaction_value, COUNT(DISTINCT customer_id) * 1.5 as estimated_footfall, COUNT(DISTINCT transaction_id) / (COUNT(DISTINCT customer_id) * 1.5) as conversion_rate FROM sales WHERE sale_date >= CURRENT_DATE() - INTERVAL 30 DAYS AND store_id = '{{ store_id }}' GROUP BY sale_date ORDER BY sale_date DESC"
+        "id": "critical_alerts",
+        "title": "Critical Inventory Alerts",
+        "description": "Items requiring immediate attention",
+        "widget_type": "table",
+        "position": {
+          "size_x": 6,
+          "size_y": 4,
+          "row": 6,
+          "col": 0
         },
-        "visualizations": {
-          "type": "line",
-          "xAxis": "sale_date",
-          "yAxis": ["conversion_rate", "avg_transaction_value"],
-          "series": ["conversion_rate", "avg_transaction_value"],
-          "yAxisPosition": "left"
-        }
+        "query": "SELECT product_name, alert_type, ending_inventory, days_since_last_sale FROM inventory_alerts_materialized WHERE store_id = '{{ store_filter }}' AND priority = 'CRITICAL' ORDER BY ending_inventory ASC LIMIT 10"
       },
-
       {
-        "id": "loyalty-breakdown",
-        "title": "Customer Loyalty Tiers",
-        "type": "chart",
-        "position": {"x": 8, "y": 18, "width": 4, "height": 6},
-        "query": {
-          "sql": "SELECT cs.loyalty_tier, COUNT(*) as customer_count, AVG(cs.total_spent) as avg_spent, COUNT(CASE WHEN cs.churn_risk = 'HIGH' THEN 1 END) as high_churn_risk FROM customer_segments cs WHERE cs.preferred_store_id = '{{ store_id }}' GROUP BY cs.loyalty_tier ORDER BY avg_spent DESC"
+        "id": "top_products",
+        "title": "Top Performing Products (Last 7 Days)",
+        "description": "Best sellers by revenue",
+        "widget_type": "table",
+        "position": {
+          "size_x": 6,
+          "size_y": 4,
+          "row": 6,
+          "col": 6
         },
-        "visualizations": {
-          "type": "pie",
-          "labelColumn": "loyalty_tier",
-          "valueColumn": "customer_count"
-        }
+        "query": "SELECT p.product_name, SUM(s.total_amount) as revenue, SUM(s.quantity) as units_sold FROM sales s JOIN products p ON s.product_id = p.product_id WHERE s.sale_date >= CURRENT_DATE() - INTERVAL 7 DAYS AND s.store_id = '{{ store_filter }}' GROUP BY p.product_name ORDER BY revenue DESC LIMIT 10"
       },
-
       {
-        "id": "category-performance",
-        "title": "Category Performance (Last 30 Days)",
-        "type": "chart",
-        "position": {"x": 0, "y": 24, "width": 12, "height": 6},
-        "query": {
-          "sql": "SELECT c.category_name, SUM(s.quantity) as total_units, SUM(s.total_amount) as total_revenue, (SUM(s.total_amount - (p.unit_cost * s.quantity)) / SUM(s.total_amount)) * 100 as margin_percent FROM sales s JOIN products p ON s.product_id = p.product_id JOIN categories c ON p.category_id = c.category_id WHERE s.sale_date >= CURRENT_DATE() - INTERVAL 30 DAYS AND s.store_id = '{{ store_id }}' GROUP BY c.category_name ORDER BY total_revenue DESC"
+        "id": "hourly_performance",
+        "title": "Today's Hourly Sales Pattern",
+        "description": "Sales by hour to optimize staffing",
+        "widget_type": "chart",
+        "position": {
+          "size_x": 6,
+          "size_y": 3,
+          "row": 10,
+          "col": 0
         },
-        "visualizations": {
-          "type": "bar",
-          "xAxis": "category_name",
-          "yAxis": ["total_revenue", "margin_percent"],
-          "series": ["total_revenue", "margin_percent"]
-        }
+        "options": {
+          "globalSeriesType": "column",
+          "xAxis": {
+            "type": "category",
+            "labels": {
+              "enabled": true
+            }
+          }
+        },
+        "query": "SELECT HOUR(sale_timestamp) as hour, SUM(total_amount) as hourly_sales FROM sales WHERE sale_date = CURRENT_DATE() AND store_id = '{{ store_filter }}' GROUP BY HOUR(sale_timestamp) ORDER BY hour"
       },
-
       {
-        "id": "weekly-trend",
-        "title": "Weekly Performance Trend",
-        "type": "chart",
-        "position": {"x": 0, "y": 30, "width": 8, "height": 6},
-        "query": {
-          "sql": "WITH weekly_sales AS (SELECT DATE_TRUNC('week', sale_date) as week_start, SUM(total_amount) as weekly_sales, COUNT(DISTINCT transaction_id) as weekly_transactions FROM sales WHERE sale_date >= CURRENT_DATE() - INTERVAL 12 WEEKS AND store_id = '{{ store_id }}' GROUP BY DATE_TRUNC('week', sale_date)), weekly_comparison AS (SELECT week_start, weekly_sales, weekly_transactions, LAG(weekly_sales) OVER (ORDER BY week_start) as prev_week_sales FROM weekly_sales) SELECT week_start, weekly_sales, prev_week_sales, CASE WHEN prev_week_sales > 0 THEN ((weekly_sales - prev_week_sales) / prev_week_sales) * 100 ELSE 0 END as sales_growth_percent FROM weekly_comparison WHERE week_start >= CURRENT_DATE() - INTERVAL 8 WEEKS ORDER BY week_start DESC"
+        "id": "customer_metrics",
+        "title": "Customer Metrics Today",
+        "description": "Traffic and conversion metrics",
+        "widget_type": "table",
+        "position": {
+          "size_x": 6,
+          "size_y": 3,
+          "row": 10,
+          "col": 6
         },
-        "visualizations": {
-          "type": "line",
-          "xAxis": "week_start",
-          "yAxis": ["weekly_sales", "sales_growth_percent"],
-          "series": ["weekly_sales", "sales_growth_percent"]
-        }
-      },
-
+        "query": "SELECT COUNT(DISTINCT transaction_id) as transactions, COUNT(DISTINCT customer_id) as unique_customers, AVG(total_amount) as avg_transaction, SUM(CASE WHEN return_flag THEN 1 ELSE 0 END) as returns FROM sales WHERE sale_date = CURRENT_DATE() AND store_id = '{{ store_filter }}'"
+      }
+    ],
+    "parameters": [
       {
-        "id": "returns-analysis",
-        "title": "Returns Analysis (Last 30 Days)",
-        "type": "table",
-        "position": {"x": 8, "y": 30, "width": 4, "height": 6},
-        "query": {
-          "sql": "SELECT p.product_name, c.category_name, COUNT(*) as return_count, SUM(s.total_amount) as return_value, AVG(s.total_amount) as avg_return_value FROM sales s JOIN products p ON s.product_id = p.product_id JOIN categories c ON p.category_id = c.category_id WHERE s.return_flag = true AND s.sale_date >= CURRENT_DATE() - INTERVAL 30 DAYS AND s.store_id = '{{ store_id }}' GROUP BY p.product_name, c.category_name ORDER BY return_value DESC LIMIT 10"
-        },
-        "visualizations": {
-          "type": "table",
-          "columns": ["product_name", "return_count", "return_value", "avg_return_value"]
+        "name": "store_filter",
+        "type": "query-based-dropdown-list",
+        "title": "Store",
+        "queryId": "store_list_query",
+        "multiValuesOptions": {
+          "enabled": false,
+          "separator": ","
         }
       }
-    ]
-  },
-
-  "filters": [
-    {
-      "name": "store_filter",
-      "column": "store_id",
-      "type": "dropdown",
-      "multiSelect": false,
-      "defaultValue": "{{ store_id }}"
-    },
-    {
-      "name": "date_filter",
-      "column": "sale_date",
-      "type": "date_range",
-      "defaultValue": "last_30_days"
+    ],
+    "queries": [
+      {
+        "id": "store_list_query",
+        "name": "Store List",
+        "query": "SELECT store_id as value, store_name as name FROM stores WHERE status = 'Active' ORDER BY store_name",
+        "data_source_id": "{{ warehouse_id }}"
+      }
+    ],
+    "refresh_schedule": {
+      "interval": 300,
+      "until": null
     }
-  ],
-
-  "schedules": [
-    {
-      "name": "morning_refresh",
-      "cron": "0 7 * * *",
-      "timezone": "America/Los_Angeles"
-    },
-    {
-      "name": "afternoon_refresh",
-      "cron": "0 13 * * *",
-      "timezone": "America/Los_Angeles"
-    }
-  ],
-
-  "alerts": [
-    {
-      "name": "daily_sales_target_alert",
-      "condition": "daily_sales < daily_sales_target * 0.8",
-      "recipients": ["store.manager@retailer.com"],
-      "message": "Daily sales are tracking below 80% of target for store {{ store_id }}"
-    },
-    {
-      "name": "critical_stockout_alert",
-      "condition": "COUNT(critical_stockouts) > 5",
-      "recipients": ["store.manager@retailer.com", "inventory@retailer.com"],
-      "message": "Store {{ store_id }} has {{ critical_stockouts }} critical stockouts requiring immediate attention"
-    }
-  ],
-
-  "permissions": {
-    "view": ["store_managers", "district_managers", "retail_analysts"],
-    "edit": ["store_managers", "retail_analysts"],
-    "admin": ["retail_analysts"]
-  },
-
-  "genie": {
-    "enabled": true,
-    "context": "This dashboard shows store manager KPIs including sales performance, inventory alerts, customer metrics, and product performance for store {{ store_id }}.",
-    "suggestedQueries": [
-      "What are today's sales vs target?",
-      "Which products are out of stock?",
-      "How is conversion rate trending?",
-      "What are the top selling categories?",
-      "Which customers are at risk of churning?",
-      "How did this week compare to last week?",
-      "What promotions are currently running?",
-      "Which products have the highest return rate?"
-    ]
   }
 }

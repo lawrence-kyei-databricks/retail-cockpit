@@ -1,314 +1,46 @@
 {
-  "version": "1.0",
-  "displayName": "Supply Chain Insights",
-  "description": "Comprehensive dashboard for supply chain managers to monitor inventory health, supplier performance, demand forecasting, and logistics optimization.",
-  "tags": ["retail", "supply-chain", "inventory", "suppliers", "logistics"],
-
-  "parameters": [
-    {
-      "name": "region_filter",
-      "displayName": "Region",
-      "type": "text",
-      "defaultValue": "All"
-    },
-    {
-      "name": "supplier_filter",
-      "displayName": "Supplier",
-      "type": "text",
-      "defaultValue": "All"
-    },
-    {
-      "name": "priority_level",
-      "displayName": "Priority Level",
-      "type": "text",
-      "defaultValue": "All"
-    }
-  ],
-
-  "layout": {
+  "version": "v2",
+  "dashboard": {
+    "display_name": "Supply Chain Insights",
+    "description": "Inventory optimization, supplier performance, and demand forecasting",
+    "tags": ["retail", "supply-chain", "inventory"],
     "widgets": [
       {
-        "id": "kpi-summary",
-        "title": "Supply Chain KPIs",
-        "type": "counter",
-        "position": {"x": 0, "y": 0, "width": 12, "height": 4},
-        "query": {
-          "sql": "SELECT 'Total Inventory Value' as kpi_name, CONCAT('$', FORMAT_NUMBER(SUM(i.ending_inventory * p.unit_cost), 0)) as current_value, 'Monthly' as frequency FROM inventory i JOIN products p ON i.product_id = p.product_id WHERE i.inventory_date = (SELECT MAX(inventory_date) FROM inventory) UNION ALL SELECT 'Stock Availability' as kpi_name, CONCAT(ROUND((COUNT(*) - COUNT(CASE WHEN ia.alert_type = 'STOCKOUT' THEN 1 END)) * 100.0 / COUNT(*), 1), '%') as current_value, 'Daily' as frequency FROM inventory_alerts ia UNION ALL SELECT 'On-Time Delivery' as kpi_name, '92.3%' as current_value, 'Monthly' as frequency"
-        },
-        "visualizations": {
-          "type": "counter",
-          "counterLabel": "current_value",
-          "targetLabel": "kpi_name",
-          "rowNumber": 3
-        }
+        "id": "inventory_alerts",
+        "title": "Inventory Alerts Overview",
+        "widget_type": "chart",
+        "position": {"size_x": 6, "size_y": 3, "row": 0, "col": 0},
+        "query": "SELECT alert_type, COUNT(*) as count FROM inventory_alerts_materialized GROUP BY alert_type"
       },
-
       {
-        "id": "inventory-health",
-        "title": "Inventory Health by Region",
-        "type": "chart",
-        "position": {"x": 0, "y": 4, "width": 8, "height": 6},
-        "query": {
-          "sql": "SELECT st.region, COUNT(CASE WHEN ia.alert_type = 'STOCKOUT' THEN 1 END) as stockouts, COUNT(CASE WHEN ia.alert_type = 'LOW_STOCK' THEN 1 END) as low_stock, COUNT(CASE WHEN ia.alert_type = 'OVERSTOCK' THEN 1 END) as overstock, COUNT(CASE WHEN ia.alert_type = 'NORMAL' THEN 1 END) as normal_stock FROM inventory_alerts ia JOIN stores st ON ia.store_id = st.store_id GROUP BY st.region ORDER BY stockouts DESC"
-        },
-        "visualizations": {
-          "type": "stacked_bar",
-          "xAxis": "region",
-          "yAxis": ["stockouts", "low_stock", "overstock", "normal_stock"],
-          "series": ["stockouts", "low_stock", "overstock", "normal_stock"]
-        }
+        "id": "critical_stockouts",
+        "title": "Critical Stockouts", 
+        "widget_type": "counter",
+        "position": {"size_x": 6, "size_y": 3, "row": 0, "col": 6},
+        "query": "SELECT COUNT(*) FROM inventory_alerts_materialized WHERE priority = 'CRITICAL'"
       },
-
       {
-        "id": "critical-stockouts",
-        "title": "Critical Stockouts",
-        "type": "table",
-        "position": {"x": 8, "y": 4, "width": 4, "height": 6},
-        "query": {
-          "sql": "SELECT ia.store_name, ia.product_name, ia.category_name, ia.days_since_last_sale as stockout_days, COALESCE(ia.avg_daily_sales, 0) as daily_sales, ia.days_since_last_sale * COALESCE(ia.avg_daily_sales, 0) * p.retail_price as lost_revenue FROM inventory_alerts ia JOIN products p ON ia.product_id = p.product_id WHERE ia.alert_type = 'STOCKOUT' AND ia.priority = 'CRITICAL' ORDER BY lost_revenue DESC LIMIT 10"
-        },
-        "visualizations": {
-          "type": "table",
-          "columns": ["store_name", "product_name", "stockout_days", "daily_sales", "lost_revenue"],
-          "conditionalFormatting": [
-            {
-              "column": "stockout_days",
-              "condition": "> 7",
-              "format": {"backgroundColor": "#F44336", "color": "white"}
-            }
-          ]
-        }
-      },
-
-      {
-        "id": "supplier-scorecard",
-        "title": "Supplier Performance Scorecard",
-        "type": "table",
-        "position": {"x": 0, "y": 10, "width": 12, "height": 8},
-        "query": {
-          "sql": "WITH supplier_orders AS (SELECT s.supplier_id, s.supplier_name, COUNT(DISTINCT p.product_id) as products_supplied, AVG(s.lead_time_days) as avg_lead_time, AVG(s.performance_rating) as avg_performance_rating FROM suppliers s JOIN products p ON s.supplier_id = p.supplier_id GROUP BY s.supplier_id, s.supplier_name) SELECT so.supplier_name, so.products_supplied, so.avg_lead_time, so.avg_performance_rating, (so.avg_performance_rating / 5 * 100) as performance_score, CASE WHEN (so.avg_performance_rating / 5 * 100) >= 80 THEN 'Preferred' WHEN (so.avg_performance_rating / 5 * 100) >= 60 THEN 'Approved' ELSE 'Under Review' END as supplier_status FROM supplier_orders so ORDER BY performance_score DESC"
-        },
-        "visualizations": {
-          "type": "table",
-          "columns": ["supplier_name", "products_supplied", "avg_lead_time", "avg_performance_rating", "performance_score", "supplier_status"],
-          "conditionalFormatting": [
-            {
-              "column": "supplier_status",
-              "condition": "Preferred",
-              "format": {"backgroundColor": "#4CAF50", "color": "white"}
-            },
-            {
-              "column": "supplier_status",
-              "condition": "Under Review",
-              "format": {"backgroundColor": "#FF9800", "color": "white"}
-            }
-          ]
-        }
-      },
-
-      {
-        "id": "replenishment-priorities",
+        "id": "replenishment_needs",
         "title": "Replenishment Priorities",
-        "type": "table",
-        "position": {"x": 0, "y": 18, "width": 8, "height": 8},
-        "query": {
-          "sql": "WITH replenishment_calc AS (SELECT i.store_id, i.product_id, i.sku, i.ending_inventory, COALESCE(pp.units_per_day, 0) as daily_sales, s.lead_time_days, CASE WHEN COALESCE(pp.units_per_day, 0) > 0 THEN i.ending_inventory / COALESCE(pp.units_per_day, 0) ELSE 999 END as days_until_stockout, GREATEST(i.reorder_point + (COALESCE(pp.units_per_day, 0) * s.lead_time_days) - i.ending_inventory, 0) as suggested_order_qty FROM inventory i JOIN products p ON i.product_id = p.product_id JOIN suppliers s ON p.supplier_id = s.supplier_id LEFT JOIN product_performance pp ON i.product_id = pp.product_id WHERE i.inventory_date = (SELECT MAX(inventory_date) FROM inventory)) SELECT st.store_name, p.product_name, c.category_name, s.supplier_name, rc.ending_inventory, rc.days_until_stockout, rc.suggested_order_qty, CASE WHEN rc.days_until_stockout <= s.lead_time_days THEN 'Urgent' WHEN rc.days_until_stockout <= s.lead_time_days * 1.5 THEN 'High Priority' ELSE 'Normal Priority' END as priority_level FROM replenishment_calc rc JOIN stores st ON rc.store_id = st.store_id JOIN products p ON rc.product_id = p.product_id JOIN categories c ON p.category_id = c.category_id JOIN suppliers s ON p.supplier_id = s.supplier_id WHERE rc.suggested_order_qty > 0 ORDER BY CASE WHEN rc.days_until_stockout <= s.lead_time_days THEN 1 ELSE 2 END, rc.days_until_stockout ASC LIMIT 20"
-        },
-        "visualizations": {
-          "type": "table",
-          "columns": ["store_name", "product_name", "supplier_name", "ending_inventory", "days_until_stockout", "suggested_order_qty", "priority_level"],
-          "conditionalFormatting": [
-            {
-              "column": "priority_level",
-              "condition": "Urgent",
-              "format": {"backgroundColor": "#F44336", "color": "white"}
-            },
-            {
-              "column": "priority_level",
-              "condition": "High Priority",
-              "format": {"backgroundColor": "#FF9800", "color": "white"}
-            }
-          ]
-        }
+        "widget_type": "table",
+        "position": {"size_x": 12, "size_y": 5, "row": 3, "col": 0},
+        "query": "SELECT store_name, product_name, ending_inventory, reorder_point, priority FROM inventory_alerts_materialized WHERE priority IN ('CRITICAL', 'HIGH') ORDER BY ending_inventory ASC LIMIT 25"
       },
-
       {
-        "id": "inventory-turnover",
-        "title": "Inventory Turnover Analysis",
-        "type": "chart",
-        "position": {"x": 8, "y": 18, "width": 4, "height": 8},
-        "query": {
-          "sql": "WITH inventory_turns AS (SELECT c.category_name, AVG(i.ending_inventory) as avg_inventory, SUM(COALESCE(pp.total_units_sold, 0)) as units_sold, (SUM(COALESCE(pp.total_units_sold, 0)) * 4) / NULLIF(AVG(i.ending_inventory), 0) as annual_turns FROM categories c JOIN products p ON c.category_id = p.category_id LEFT JOIN inventory i ON p.product_id = i.product_id LEFT JOIN product_performance pp ON p.product_id = pp.product_id WHERE c.category_level = 2 AND i.inventory_date >= CURRENT_DATE() - INTERVAL 30 DAYS GROUP BY c.category_name) SELECT category_name, annual_turns, CASE WHEN annual_turns >= 8 THEN 'Fast Moving' WHEN annual_turns >= 4 THEN 'Medium Velocity' WHEN annual_turns >= 2 THEN 'Slow Moving' ELSE 'Very Slow' END as velocity_category FROM inventory_turns ORDER BY annual_turns DESC"
-        },
-        "visualizations": {
-          "type": "bar",
-          "xAxis": "category_name",
-          "yAxis": ["annual_turns"],
-          "series": ["annual_turns"],
-          "color": "velocity_category"
-        }
+        "id": "supplier_performance",
+        "title": "Supplier Performance",
+        "widget_type": "table",
+        "position": {"size_x": 6, "size_y": 4, "row": 8, "col": 0},
+        "query": "SELECT supplier_name, performance_rating, lead_time_days FROM suppliers ORDER BY performance_rating DESC"
       },
-
       {
-        "id": "demand-forecast-accuracy",
-        "title": "Demand Forecast Accuracy",
-        "type": "chart",
-        "position": {"x": 0, "y": 26, "width": 8, "height": 6},
-        "query": {
-          "sql": "WITH forecast_accuracy AS (SELECT p.category_name, AVG(ABS(s1.quantity - COALESCE(s2.quantity, s1.quantity)) / s1.quantity * 100) as avg_forecast_error FROM sales s1 LEFT JOIN sales s2 ON s1.product_id = s2.product_id AND s1.store_id = s2.store_id AND s2.sale_date = s1.sale_date - INTERVAL 7 DAYS JOIN products p ON s1.product_id = p.product_id JOIN categories c ON p.category_id = c.category_id WHERE s1.sale_date >= CURRENT_DATE() - INTERVAL 8 WEEKS AND c.category_level = 2 GROUP BY p.category_name) SELECT category_name, avg_forecast_error, CASE WHEN avg_forecast_error <= 20 THEN 'Excellent' WHEN avg_forecast_error <= 30 THEN 'Good' WHEN avg_forecast_error <= 50 THEN 'Fair' ELSE 'Poor' END as accuracy_rating FROM forecast_accuracy ORDER BY avg_forecast_error ASC"
-        },
-        "visualizations": {
-          "type": "bar",
-          "xAxis": "category_name",
-          "yAxis": ["avg_forecast_error"],
-          "series": ["avg_forecast_error"],
-          "color": "accuracy_rating"
-        }
-      },
-
-      {
-        "id": "supply-chain-risks",
-        "title": "Supply Chain Risk Assessment",
-        "type": "table",
-        "position": {"x": 8, "y": 26, "width": 4, "height": 6},
-        "query": {
-          "sql": "WITH supplier_concentration AS (SELECT c.category_name, COUNT(DISTINCT p.supplier_id) as supplier_count, MAX(COUNT(p.product_id)) OVER (PARTITION BY c.category_name, p.supplier_id) * 100.0 / COUNT(p.product_id) as max_supplier_share FROM categories c JOIN products p ON c.category_id = p.category_id WHERE c.category_level = 2 GROUP BY c.category_name, p.supplier_id) SELECT category_name, supplier_count, max_supplier_share, CASE WHEN max_supplier_share > 70 THEN 'High Risk' WHEN max_supplier_share > 50 THEN 'Medium Risk' ELSE 'Low Risk' END as risk_level, CASE WHEN max_supplier_share > 70 THEN 'Diversify supplier base' WHEN max_supplier_share > 50 THEN 'Monitor concentration' ELSE 'Continue monitoring' END as recommendation FROM (SELECT category_name, AVG(supplier_count) as supplier_count, MAX(max_supplier_share) as max_supplier_share FROM supplier_concentration GROUP BY category_name) ORDER BY max_supplier_share DESC"
-        },
-        "visualizations": {
-          "type": "table",
-          "columns": ["category_name", "supplier_count", "max_supplier_share", "risk_level", "recommendation"],
-          "conditionalFormatting": [
-            {
-              "column": "risk_level",
-              "condition": "High Risk",
-              "format": {"backgroundColor": "#F44336", "color": "white"}
-            },
-            {
-              "column": "risk_level",
-              "condition": "Medium Risk",
-              "format": {"backgroundColor": "#FF9800", "color": "white"}
-            }
-          ]
-        }
-      },
-
-      {
-        "id": "cost-optimization",
-        "title": "Cost Optimization Opportunities",
-        "type": "table",
-        "position": {"x": 0, "y": 32, "width": 8, "height": 6},
-        "query": {
-          "sql": "WITH cost_analysis AS (SELECT c.category_name, AVG(p.unit_cost) as avg_unit_cost, AVG((p.retail_price - p.unit_cost) / p.retail_price * 100) as avg_margin_percent, COUNT(DISTINCT p.supplier_id) as supplier_count, AVG(s.lead_time_days) as avg_lead_time, SUM(COALESCE(pp.current_inventory, 0) * p.unit_cost) * 0.02 as monthly_carrying_cost FROM categories c JOIN products p ON c.category_id = p.category_id JOIN suppliers s ON p.supplier_id = s.supplier_id LEFT JOIN product_performance pp ON p.product_id = pp.product_id WHERE c.category_level = 2 GROUP BY c.category_name) SELECT category_name, avg_unit_cost, avg_margin_percent, supplier_count, avg_lead_time, monthly_carrying_cost, CASE WHEN supplier_count = 1 THEN 'Single source risk' WHEN avg_margin_percent < 25 THEN 'Low margin' WHEN avg_lead_time > 21 THEN 'Long lead time' WHEN monthly_carrying_cost > 5000 THEN 'High carrying cost' ELSE 'Optimized' END as optimization_opportunity FROM cost_analysis ORDER BY monthly_carrying_cost DESC"
-        },
-        "visualizations": {
-          "type": "table",
-          "columns": ["category_name", "avg_margin_percent", "supplier_count", "avg_lead_time", "monthly_carrying_cost", "optimization_opportunity"]
-        }
-      },
-
-      {
-        "id": "logistics-performance",
-        "title": "Logistics Performance by Region",
-        "type": "chart",
-        "position": {"x": 8, "y": 32, "width": 4, "height": 6},
-        "query": {
-          "sql": "SELECT st.region, AVG(s.lead_time_days) as avg_lead_time, COUNT(CASE WHEN i.received_quantity > 0 THEN 1 END) as total_deliveries, (COUNT(CASE WHEN i.received_quantity > 0 AND RANDOM() > 0.1 THEN 1 END) * 100.0 / COUNT(CASE WHEN i.received_quantity > 0 THEN 1 END)) as on_time_percent FROM inventory i JOIN stores st ON i.store_id = st.store_id JOIN products p ON i.product_id = p.product_id JOIN suppliers s ON p.supplier_id = s.supplier_id WHERE i.inventory_date >= CURRENT_DATE() - INTERVAL 30 DAYS GROUP BY st.region ORDER BY on_time_percent DESC"
-        },
-        "visualizations": {
-          "type": "bar",
-          "xAxis": "region",
-          "yAxis": ["on_time_percent"],
-          "series": ["on_time_percent"]
-        }
+        "id": "slow_moving",
+        "title": "Slow Moving Items",
+        "widget_type": "table",
+        "position": {"size_x": 6, "size_y": 4, "row": 8, "col": 6},
+        "query": "SELECT product_name, days_on_hand, ending_inventory FROM inventory_alerts_materialized WHERE alert_type = 'SLOW_MOVING' ORDER BY days_on_hand DESC LIMIT 15"
       }
-    ]
-  },
-
-  "filters": [
-    {
-      "name": "region_filter",
-      "column": "region",
-      "type": "dropdown",
-      "multiSelect": true,
-      "defaultValue": ["All"]
-    },
-    {
-      "name": "supplier_filter",
-      "column": "supplier_name",
-      "type": "dropdown",
-      "multiSelect": true,
-      "defaultValue": ["All"]
-    },
-    {
-      "name": "category_filter",
-      "column": "category_name",
-      "type": "dropdown",
-      "multiSelect": true,
-      "defaultValue": ["All"]
-    },
-    {
-      "name": "priority_filter",
-      "column": "priority_level",
-      "type": "dropdown",
-      "multiSelect": true,
-      "defaultValue": ["All"]
-    }
-  ],
-
-  "schedules": [
-    {
-      "name": "morning_refresh",
-      "cron": "0 7 * * *",
-      "timezone": "America/Los_Angeles"
-    },
-    {
-      "name": "afternoon_refresh",
-      "cron": "0 14 * * *",
-      "timezone": "America/Los_Angeles"
-    }
-  ],
-
-  "alerts": [
-    {
-      "name": "critical_stockouts",
-      "condition": "COUNT(critical_stockouts) > 10",
-      "recipients": ["supply.chain@retailer.com", "operations@retailer.com"],
-      "message": "{{ critical_stockouts }} critical stockouts require immediate attention"
-    },
-    {
-      "name": "supplier_performance_issues",
-      "condition": "on_time_delivery_percent < 85",
-      "recipients": ["supply.chain@retailer.com", "procurement@retailer.com"],
-      "message": "Supplier {{ supplier_name }} on-time delivery dropped to {{ on_time_delivery_percent }}%"
-    },
-    {
-      "name": "high_risk_concentration",
-      "condition": "risk_level = 'High Risk'",
-      "recipients": ["supply.chain@retailer.com", "risk@retailer.com"],
-      "message": "High supplier concentration risk detected in {{ category_name }}"
-    }
-  ],
-
-  "permissions": {
-    "view": ["supply_chain_managers", "operations_managers", "procurement_team", "retail_analysts"],
-    "edit": ["supply_chain_managers", "retail_analysts"],
-    "admin": ["retail_analysts"]
-  },
-
-  "genie": {
-    "enabled": true,
-    "context": "This dashboard provides supply chain insights including inventory health, supplier performance, demand forecasting, replenishment planning, and cost optimization for retail operations.",
-    "suggestedQueries": [
-      "Which products are at risk of stockout?",
-      "How are our suppliers performing on delivery?",
-      "What categories need replenishment priority?",
-      "Where do we have inventory concentration risks?",
-      "Which regions have the best logistics performance?",
-      "What are our biggest cost optimization opportunities?",
-      "How accurate are our demand forecasts?",
-      "Which suppliers should we prioritize?",
-      "What's our overall inventory turnover?",
-      "Where are we overstocked?"
-    ]
+    ],
+    "refresh_schedule": {"interval": 1800}
   }
 }
