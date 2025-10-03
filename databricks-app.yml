@@ -1,0 +1,78 @@
+name: retail-insight-cockpit
+display_name: "Retail Insight Cockpit Setup"
+description: "Complete retail analytics solution with dashboards and Genie AI"
+
+# App configuration
+config:
+  command:
+    - "python"
+    - "-m"
+    - "streamlit"
+    - "run"
+    - "app.py"
+    - "--server.port=8501"
+    - "--server.address=0.0.0.0"
+    - "--server.headless=true"
+    - "--browser.gatherUsageStats=false"
+
+# Required permissions
+permissions:
+  - "workspace-access"
+  - "sql-access"
+  - "unity-catalog-access"
+
+# Resource requirements
+resources:
+  description: "Resources needed for the Retail Insight Cockpit app"
+  requests:
+    cpu: "1"
+    memory: "2Gi"
+  limits:
+    cpu: "2"
+    memory: "4Gi"
+
+# Environment variables
+env:
+  - name: "DATABRICKS_HOST"
+    valueFrom: "databricks-host"
+  - name: "DATABRICKS_TOKEN"
+    valueFrom: "databricks-token"
+
+# Health check
+healthcheck:
+  path: "/_stcore/health"
+  port: 8501
+  initialDelaySeconds: 30
+  periodSeconds: 10
+
+# App metadata
+metadata:
+  version: "1.0.0"
+  category: "Analytics"
+  tags:
+    - "retail"
+    - "analytics"
+    - "dashboards"
+    - "genie-ai"
+
+  # Support information
+  support:
+    documentation: "https://github.com/databricks/retail-insight-cockpit"
+    contact: "support@databricks.com"
+
+# File inclusions
+include:
+  - "app.py"
+  - "app_requirements.txt"
+  - "src/**/*"
+  - "dashboards/**/*"
+  - "setup_genie.py"
+  - "databricks.yml"
+
+# File exclusions
+exclude:
+  - ".git/**/*"
+  - "*.pyc"
+  - "__pycache__/**/*"
+  - ".env"
+  - "*.log"

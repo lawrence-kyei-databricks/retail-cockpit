@@ -201,9 +201,9 @@ for query in test_queries:
     try:
         result = spark.sql(query).collect()[0][0]
         table_name = query.split("FROM ")[1].split(".")[-1]
-        print(f"✅ {table_name}: {result:,} records")
+        print(f"[OK] {table_name}: {result:,} records")
     except Exception as e:
-        print(f"❌ Error accessing data: {e}")
+        print(f"[ERROR] Error accessing data: {e}")
 
 # COMMAND ----------
 
@@ -213,9 +213,9 @@ for query in test_queries:
 # COMMAND ----------
 
 print("""
-🤖 Genie AI Setup Complete!
+Genie AI Setup Complete!
 
-📋 Manual Setup Steps (Complete in Databricks UI):
+Manual Setup Steps (Complete in Databricks UI):
 
 1. **Create Genie Space:**
    - Go to Databricks workspace
@@ -243,34 +243,34 @@ print("""
    - Provide training on natural language queries
    - Share sample questions as examples
 
-🎯 Sample Questions to Test:
+Sample Questions to Test:
 """)
 
-print("\n👩‍💼 Store Manager:")
+print("\nStore Manager:")
 for q in store_manager_questions[:3]:
-    print(f"   • {q}")
+    print(f"   - {q}")
 
-print("\n🛍️ Merchandiser:")
+print("\nMerchandiser:")
 for q in merchandiser_questions[:3]:
-    print(f"   • {q}")
+    print(f"   - {q}")
 
-print("\n📦 Supply Chain:")
+print("\nSupply Chain:")
 for q in supply_chain_questions[:3]:
-    print(f"   • {q}")
+    print(f"   - {q}")
 
-print("\n👔 Executive:")
+print("\nExecutive:")
 for q in executive_questions[:3]:
-    print(f"   • {q}")
+    print(f"   - {q}")
 
 print(f"""
 
-✨ Your Retail Insight Cockpit is now ready with:
-   - ✅ All data tables and views
-   - ✅ Role-based dashboards
-   - ✅ Genie AI configuration
-   - ✅ Sample questions and business context
+Your Retail Insight Cockpit is now ready with:
+   - All data tables and views
+   - Role-based dashboards
+   - Genie AI configuration
+   - Sample questions and business context
 
-🚀 Start asking questions in natural language!
+Start asking questions in natural language!
 """)
 
 # COMMAND ----------
@@ -299,4 +299,4 @@ for role, questions in all_questions.items():
         print(f"{i:2d}. {question}")
 
 print(f"\nTotal sample questions: {sum(len(q) for q in all_questions.values())}")
-print("Genie AI setup complete! 🎉")
+print("Genie AI setup complete!")
